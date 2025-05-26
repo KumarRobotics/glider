@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
 project(glider)
-#TODO better project name
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -16,23 +15,20 @@ find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(GTest REQUIRED)
 find_package(yaml-cpp REQUIRED)
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
-  sensor_msgs
-  nav_msgs
-)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(message_filters REQUIRED)
+find_package(tf2_eigen REQUIRED)
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES glider
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs nav_msgs
-)
+set(node_plugins "")
 
 # Include directories
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${GTSAM_INCLUDE_DIR}
   ${yaml-cpp_INCLUDE_DIRS}
@@ -52,8 +48,15 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     gtsam
     yaml-cpp
     tbb
-    ${catkin_LIBRARIES}
+    rclcpp::rclcpp
+    rclcpp_components::component
+    ${sensor_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
 )
+
+rclcpp_components_register_nodes(${PROJECT_NAME} "glider::FactorManagerNode")
+set(node_plugins "${node_plugins}glider::FactorManagerNode;$<TARGET_FILE:${PROJECT_NAME}>\n")
 
 # executables
 add_executable(glider_ros
@@ -110,3 +113,5 @@ gtest_discover_tests(params_test)
 gtest_discover_tests(factor_test)
 gtest_discover_tests(quaternion_test)
 gtest_discover_tests(heading_test)
+
+ament_package()

@@ -5,8 +5,7 @@
 
 #include "glider/utils/quaternion.hpp"
 
-namespace glider
-{
+using namespace glider;
 
 Quaternion::Quaternion(double x_in, double y_in, double z_in, double w_in)
 {
@@ -16,7 +15,7 @@ Quaternion::Quaternion(double x_in, double y_in, double z_in, double w_in)
     w = w_in;
 }
 
-Quaternion::Quaternion(geometry_msgs::Quaternion q)
+Quaternion::Quaternion(geometry_msgs::msg::Quaternion q)
 {
     x = q.x;
     y = q.y;
@@ -58,4 +57,4 @@ Eigen::Vector4d Quaternion::toEigen()
     Eigen::Vector4d ret(w, x, y, z);
     return ret;
 }
-}
+

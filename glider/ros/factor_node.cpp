@@ -5,65 +5,82 @@
 
 #include "glider/ros/factor_node.hpp"
 #include "glider/ros/node_utils.hpp"
-
-FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
+FactorManagerNode::FactorManagerNode(const rclcpp::NodeOptions& options) : rclcpp::Node("glider_node", options)
 {
-    double freq;
-    nh_.getParam("/glider_node/rate", freq);
-    ROS_DEBUG_STREAM("Useing prediction rate: "<< freq);
-    
-    std::string path;
-    nh_.getParam("/glider_node/path", path);
-    ROS_DEBUG_STREAM("Loading graph params from: "<< path);
-    
-    nh_.getParam("/use_sim_time", use_sim_time_);
 
-    std::map<std::string, double> config;
-    config = params.load<double>(path);
+    const std::map<std::string, double>& config = { };
 
     factor_manager_ = glider::FactorManager(config);
+    imu_msgs_ = 0;
 
-    gps_sub_ = nh_.subscribe("/gps", 1, &FactorNode::gpsCallback, this);
-    imu_sub_ = nh_.subscribe("/imu", 10, &FactorNode::imuCallback, this);
-    odom_sub_ = nh_.subscribe("/odom", 1, &FactorNode::odomCallback, this);
+    imu_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    gps_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-    odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/glins", 10);
+    odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/glider/odom", 1);
+    
+    // Create subscribers with callback groups
+    auto imu_sub_options = rclcpp::SubscriptionOptions();
+    imu_sub_options.callback_group = imu_group_;
+    imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+        "/imu", 20, 
+        std::bind(&FactorManagerNode::imuCallback, this, std::placeholders::_1),
+        imu_sub_options);
+    
+    auto gps_sub_options = rclcpp::SubscriptionOptions();
+    gps_sub_options.callback_group = gps_group_;
+    gps_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
+        "/gps", 1, 
+        std::bind(&FactorManagerNode::gpsCallback, this, std::placeholders::_1),
+        gps_sub_options);
 
-    ros::Duration d = rosutil::hzToDuration(freq);
-    timer_ = nh_.createTimer(d, &FactorNode::interpolationCallback, this);
-    ROS_INFO("Factor Manager Node Initialized");
+    auto odom_sub_options = rclcpp::SubscriptionOptions();
+    odom_sub_options.callback_group = gps_group_;
+    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 1, 
+                                                                   std::bind(&FactorManagerNode::odomCallback, this, std::placeholders::_1),
+                                                                   odom_sub_options);
+
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&FactorManagerNode::predictCallback, this));
+
+    RCLCPP_INFO(this->get_logger(), "Factor Graph Node Initialized...");
 }
 
-int64_t FactorNode::getTime(const ros::Time& stamp) const
+int64_t FactorManagerNode::getTime(const builtin_interfaces::msg::Time& stamp) const 
 {
-   return (static_cast<int64_t>(stamp.sec) * 1000000000LL) + static_cast<int64_t>(stamp.nsec);
+    return (static_cast<int64_t>(stamp.sec) * 1000000000LL) + static_cast<int64_t>(stamp.nanosec);
 }
 
-void FactorNode::interpolationCallback(const ros::TimerEvent& event)
+void FactorManagerNode::predictCallback()
 {
     if (!initialized_) return;
-    
-    int64_t timestamp = getTime(ros::Time::now());
-    auto [position, orientation] = factor_manager_.predict(timestamp);
+    int64_t elapsed_time = getTime(this->now()) - last_time_now_;
+    int64_t timestamp = last_imu_stamp_ + elapsed_time;
+    auto [translation, quaternion] = factor_manager_.predict(timestamp);
 
-    if (position.norm() > 0)
-    {
-        nav_msgs::Odometry odom_msg;
+    if (translation.norm() > 0) 
+    {  
+        pose_ = translation;
+        orientation_ = quaternion;
         
-        odom_msg.pose.pose.position.x = position(0);
-        odom_msg.pose.pose.position.y = position(1);
-        odom_msg.pose.pose.position.z = position(2);
-
-        odom_msg.pose.pose.orientation.w = orientation(0);
-        odom_msg.pose.pose.orientation.x = orientation(1);
-        odom_msg.pose.pose.orientation.y = orientation(2);
-        odom_msg.pose.pose.orientation.z = orientation(3);
-
-        odom_pub_.publish(odom_msg);
+        // Publish in local frame
+        auto odom_msg = std::make_unique<nav_msgs::msg::Odometry>();
+        
+        odom_msg->pose.pose.position.x = pose_(0);//-482963.5387620803;
+        odom_msg->pose.pose.position.y = pose_(1);//-4421274.811364001;
+        odom_msg->pose.pose.position.z = pose_(2);//pose_(2);
+    
+        odom_msg->pose.pose.orientation.w = orientation_(0);
+        odom_msg->pose.pose.orientation.x = orientation_(1);
+        odom_msg->pose.pose.orientation.y = orientation_(2);
+        odom_msg->pose.pose.orientation.z = orientation_(3);
+        
+        odom_msg->header.stamp = this->get_clock()->now();
+        odom_msg->header.frame_id = "enu";
+        
+        odom_pub_->publish(std::move(odom_msg));
     }
 }
 
-void FactorNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
+void FactorManagerNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
     if (!initialized_)
     {
@@ -82,7 +99,7 @@ void FactorNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
     int64_t timestamp;
     if (use_sim_time_)
     {
-        timestamp = getTime(ros::Time::now());
+        timestamp = getTime(this->get_clock()->now());
     }
     else
     {
@@ -95,59 +112,64 @@ void FactorNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
     prev_quat_ = current_quat;
 }
 
-void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
+void FactorManagerNode::gpsCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) 
 {
-
+    // GPS output from VectorNAV
+    if (!initialized_)
+    {
+        initial_alt_ = msg->altitude;
+    }
     Eigen::Vector3d gps_factor;
+    
     gps_factor(0) = msg->latitude;
     gps_factor(1) = msg->longitude;
-    gps_factor(2) = msg->altitude;
-   
-    int64_t timestamp;
-    if (use_sim_time_)
-    {
-        timestamp = getTime(ros::Time::now());
-    }
-    else
-    {
-        timestamp = getTime(msg->header.stamp);
-    }
-
+    gps_factor(2) = msg->altitude - initial_alt_;
+    
+    int64_t timestamp = getTime(msg->header.stamp);
+    
     factor_manager_.addGpsFactor(timestamp, gps_factor);
-    //std::cout << "optimizing with time " << timestamp << std::endl;
-    auto [position, quaternion, rotation] = factor_manager_.runner();
-
-    if (!initialized_) initialized_ = true;
+     
+    auto [translation, quaternion, rotation] = factor_manager_.runner();
+    initialized_ = true; 
 }
 
-void FactorNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
+void FactorManagerNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) 
 {
-    if (!initialized_) return;
-
-    Eigen::Vector3d gyro(msg->angular_velocity.x,
-                         msg->angular_velocity.y,
-                         msg->angular_velocity.z);
+    // Callback for vector nav imu
+    imu_msgs_ ++; 
+    Eigen::Vector3d gyro(
+        msg->angular_velocity.x,
+        msg->angular_velocity.y,
+        msg->angular_velocity.z
+    );
     
-    Eigen::Vector3d accel(msg->linear_acceleration.x,
-                          msg->linear_acceleration.y,
-                          msg->linear_acceleration.z);
+    Eigen::Vector3d accel(
+        msg->linear_acceleration.x,
+        msg->linear_acceleration.y,
+        msg->linear_acceleration.z
+    );
     
-    Eigen::Vector4d quat(msg->orientation.w,
-                         msg->orientation.x,
-                         msg->orientation.y,
-                         msg->orientation.z);
-
-    int64_t timestamp;
-    if (use_sim_time_)
-    {
-        timestamp = getTime(ros::Time::now());
-    }
-    else
-    {
-        timestamp = getTime(msg->header.stamp);
-    }
+    Eigen::Vector4d quat(
+        msg->orientation.w,
+        msg->orientation.x,
+        msg->orientation.y,
+        msg->orientation.z
+    );
+    last_imu_ros_stamp_ = msg->header.stamp; 
+    int64_t timestamp = getTime(msg->header.stamp);
+    last_imu_stamp_ = timestamp;
+    last_time_now_ = getTime(this->now());
 
     factor_manager_.addImuFactor(timestamp, accel, gyro, quat);
 }
 
+Eigen::Vector4d FactorManagerNode::getOrientation() const 
+{
+    return orientation_;
+}
 
+Eigen::Vector3d FactorManagerNode::getPose() const {
+    return pose_;
+}
+
+RCLCPP_COMPONENTS_REGISTER_NODE(glider::FactorManagerNode)

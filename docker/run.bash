@@ -11,7 +11,7 @@ docker run -it --rm \
     -e DISPLAY=$DISPLAY \
     -e QT_X11_NO_MITSHM=1 \
     -e XAUTHORITY=$XAUTH \
-    --name glider-ros-noetic \
-    glider-ros:dev \
+    --name glider-ros2-jazzy \
+    glider-ros2:dev \
     bash
 xhost -
