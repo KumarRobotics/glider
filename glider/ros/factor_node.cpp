@@ -5,6 +5,9 @@
 
 #include "glider/ros/factor_node.hpp"
 #include "glider/ros/node_utils.hpp"
+
+using namespace glider;
+
 FactorManagerNode::FactorManagerNode(const rclcpp::NodeOptions& options) : rclcpp::Node("glider_node", options)
 {
 

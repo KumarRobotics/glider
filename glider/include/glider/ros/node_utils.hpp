@@ -14,7 +14,7 @@ rclcpp::Duration hzToDuration(double freq)
 
     double period_seconds = 1.0 / freq;
 
-    return rclcpp::Duration(period_seconds);
+    return rclcpp::Duration::from_seconds(period_seconds);
 }
 
 } // namespace rosutil

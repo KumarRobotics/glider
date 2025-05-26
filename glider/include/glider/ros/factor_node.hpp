@@ -21,6 +21,9 @@
 #include "glider/core/factor_manager.hpp"
 #include "glider/utils/quaternion.hpp"
 
+namespace glider
+{
+
 class FactorManagerNode : public rclcpp::Node
 {
     public:
@@ -67,3 +70,4 @@ class FactorManagerNode : public rclcpp::Node
         rclcpp::CallbackGroup::SharedPtr imu_group_;
         rclcpp::CallbackGroup::SharedPtr gps_group_;
 };
+}
