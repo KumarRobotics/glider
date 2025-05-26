@@ -1,0 +1,12 @@
+<launch>
+    <arg name="use_sim_time" default="false"/>
+    <param name="/use_sim_time" value="$(arg use_sim_time)"/>
+
+    <node pkg="glider" type="glider_ros" name="glider_node" output="screen">
+        <rosparam command="load" file="$(find glider)/config/ros_params.yaml"/>
+        <param name="path" value="$(find glider)/config/graph_params.yaml"/>
+        <remap from="/gps" to="/ublox/fix"/>
+        <remap from="/imu" to="/imu/data"/>
+        <remap from="/odom" to="/Odometry"/>
+    </node>
+</launch>
