@@ -23,10 +23,10 @@ double gpsHeading(double lat1, double lon1, double lat2, double lon2)
     double x = std::cos(lat1_rad) * std::sin(lat2_rad) - std::sin(lat1_rad) * std::cos(lat2_rad) * std::cos(lon_diff);
 
     double heading_rad = std::atan2(y, x);
-    double heading_deg = heading_rad * (180.0 / M_PI);
-    double heading_normalized = std::fmod(heading_deg + 360.0, 360);
+    //double heading_deg = heading_rad * (180.0 / M_PI);
+    //double heading_normalized = std::fmod(heading_deg + 360.0, 360);
 
-    return heading_normalized;
+    return heading_rad;
 }
 
 } // namespace geodetics

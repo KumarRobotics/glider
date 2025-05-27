@@ -141,6 +141,8 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         _graph.add(gtsam::PriorFactor<gtsam::Pose3>(X(_key_index), navstate_pose, gtsam::noiseModel::Isotropic::Sigma(6, 0.001)));
         _graph.add(gtsam::PriorFactor<gtsam::Point3>(V(_key_index), gtsam::Point3(0, 0, 0), gtsam::noiseModel::Isotropic::Sigma(3, 0.001)));
         _graph.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(B(_key_index), bias, gtsam::noiseModel::Isotropic::Sigma(6, 0.001)));
+
+        prev_gps_ = gps;
     }
                                   
     if (_key_index > 0) 
@@ -180,9 +182,9 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
                                               *pim));
         
         
-        gtsam::Rot3 mag_orient = gtsam::Rot3(_orient[0], _orient[1], _orient[2], _orient[3]);
-        gtsam::Rot3_ rot_expr = gtsam::rotation(X(_key_index));
-        _graph.addExpressionFactor(rot_expr, mag_orient, gtsam::noiseModel::Isotropic::Sigma(3,0.001));
+        //gtsam::Rot3 mag_orient = gtsam::Rot3(_orient[0], _orient[1], _orient[2], _orient[3]);
+        //gtsam::Rot3_ rot_expr = gtsam::rotation(X(_key_index));
+        //_graph.addExpressionFactor(rot_expr, mag_orient, gtsam::noiseModel::Isotropic::Sigma(3,0.001));
         _initials.insert(X(_key_index), optimized_pose);
         _initials.insert(V(_key_index), last_velocity);
         _initials.insert(B(_key_index), bias);
@@ -198,9 +200,12 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 	    }
     }
     
+    double heading = geodetics::gpsHeading(prev_gps_(0), prev_gps_(1), gps(0), gps(1));
+
     _graph.add(gtsam::GPSFactor(X(_key_index), gtsam::Point3(meas(0), meas(1), meas(2)), _gps_noise));
     _last_gps_time = nanosecInt2Float(timestamp);
     _key_index++;
+    prev_gps_ = gps;
 }
 
 void FactorManager::addOdometryFactor(int64_t timestamp, const Eigen::Vector3d& pose, const Eigen::Vector4d& quat) 
