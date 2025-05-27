@@ -1,6 +1,9 @@
 <launch>
     <arg name="use_sim_time" default="false"/>
+    <arg name="use_odom" default="true"/>
+
     <param name="/use_sim_time" value="$(arg use_sim_time)"/>
+    <param name="/use_odom" value="$(arg use_odom)"/>
 
     <node pkg="glider" type="glider_ros" name="glider_node" output="screen">
         <rosparam command="load" file="$(find glider)/config/ros_params.yaml"/>

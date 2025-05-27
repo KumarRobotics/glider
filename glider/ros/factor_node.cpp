@@ -17,6 +17,8 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
     ROS_DEBUG_STREAM("Loading graph params from: "<< path);
     
     nh_.getParam("/use_sim_time", use_sim_time_);
+    bool use_odom;
+    nh_.getParam("/use_odom", use_odom);
 
     std::map<std::string, double> config;
     config = params.load<double>(path);
@@ -25,13 +27,16 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
 
     gps_sub_ = nh_.subscribe("/gps", 1, &FactorNode::gpsCallback, this);
     imu_sub_ = nh_.subscribe("/imu", 10, &FactorNode::imuCallback, this);
-    odom_sub_ = nh_.subscribe("/odom", 1, &FactorNode::odomCallback, this);
+    if (use_odom)
+    {
+        odom_sub_ = nh_.subscribe("/odom", 1, &FactorNode::odomCallback, this);
+    }
 
-    odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/glins", 10);
+    odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/glider/odom", 10);
 
     ros::Duration d = rosutil::hzToDuration(freq);
     timer_ = nh_.createTimer(d, &FactorNode::interpolationCallback, this);
-    ROS_INFO("Factor Manager Node Initialized");
+    ROS_INFO("[GLIDER] Factor Manager Node Initialized");
 }
 
 int64_t FactorNode::getTime(const ros::Time& stamp) const

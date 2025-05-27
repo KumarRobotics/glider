@@ -9,5 +9,5 @@ double:
   gravity: 9.81
   bias_num_measurements: 100.0
   gps_noise: 2.0
-  odom_noise: 1.0
+  odom_noise: 0.01
   heading_noise: 0.1 #radians
