@@ -8,6 +8,8 @@
 #include "glider/utils/geodetics.hpp"
 #include "glider/utils/gps_heading.hpp"
 
+#include <gtsam/slam/expressions.h>
+
 using namespace glider;
 
 Eigen::Vector3d vector3(double x, double y, double z)
@@ -48,9 +50,7 @@ FactorManager::FactorManager(const std::map<std::string, double>& config, int64_
     this->prior_noise_ = gtsam::noiseModel::Isotropic::Sigma(6, this->config_["gps_noise"]);
     this->odom_noise_ = gtsam::noiseModel::Isotropic::Sigma(6, this->config_["odom_noise"]);
     this->gps_noise_ = gtsam::noiseModel::Isotropic::Sigma(3, this->config_["gps_noise"]);
-    gtsam::Vector6 pose_sigmas;
-    pose_sigmas << 0.5, 0.5, this->config_["heading_noise"],this->config_["gps_noise"], this->config_["gps_noise"], this->config_["gps_noise"];
-    this->utm_noise_ = gtsam::noiseModel::Diagonal::Sigmas(pose_sigmas);
+    this->heading_noise_ = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(M_PI/2, M_PI/2, this->config_["heading_noise"]));
 
     this->graph_ = gtsam::ExpressionFactorGraph();
     this->initials_ = gtsam::Values();
@@ -232,10 +232,8 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
     gtsam::Pose3 utm_pose(heading_rot, utm_point);
     
     std::cout << "Adding GPS factor and incrementing key" << std::endl;    
-    //graph_.addPrior(B(key_index_), bias_, gtsam::noiseModel::Isotropic::Sigma(6, 0.001));
     graph_.add(gtsam::GPSFactor(X(key_index_), gtsam::Point3(meas(0), meas(1), meas(2)), gps_noise_));
-    //graph_.add(gtsam::PriorFactor<gtsam::Rot3>(R(key_index_), heading_rot, heading_noise_));
-    //graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(key_index_), utm_pose, utm_noise_)); 
+    graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
     last_gps_time_ = timestamp_f;
     last_gps_ = gps;
     

@@ -100,7 +100,7 @@ class FactorManager
         gtsam::noiseModel::Isotropic::shared_ptr prior_noise_;
         gtsam::noiseModel::Isotropic::shared_ptr odom_noise_;
         gtsam::noiseModel::Isotropic::shared_ptr gps_noise_;
-        gtsam::noiseModel::Base::shared_ptr utm_noise_;
+        gtsam::noiseModel::Base::shared_ptr heading_noise_;
 
         // factor graph
         gtsam::ExpressionFactorGraph graph_;
