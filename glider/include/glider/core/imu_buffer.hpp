@@ -25,6 +25,7 @@ class ImuBuffer
 
         void add(double timestamp, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro, const Eigen::Vector4d& orient);
         std::vector<std::pair<double, ImuData>> get(double timestamp_start, double timestamp_end);
+        size_t size();
 
     private:
         std::map<double, ImuData> buffer_;

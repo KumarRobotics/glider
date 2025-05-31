@@ -2,3 +2,4 @@ tanqueray/build/
 .vscode/
 visualizer/build/
 **/*.pyc
+visualizer/

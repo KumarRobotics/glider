@@ -14,6 +14,7 @@ endif()
 # Find dependencies
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
+find_package(GTSAM_UNSTABLE REQUIRED)
 find_package(GTest REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
@@ -50,6 +51,7 @@ add_library(${PROJECT_NAME} SHARED
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
     gtsam
+    gtsam_unstable
     yaml-cpp
     tbb
     ${catkin_LIBRARIES}

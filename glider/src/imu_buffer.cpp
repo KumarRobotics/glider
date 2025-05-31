@@ -41,3 +41,8 @@ std::vector<std::pair<double, ImuData>> ImuBuffer::get(double timestamp_start, d
 
     return measurements;
 }
+
+size_t ImuBuffer::size()
+{
+    return buffer_.size();
+}

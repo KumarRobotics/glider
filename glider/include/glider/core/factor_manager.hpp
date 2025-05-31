@@ -13,6 +13,8 @@
 #include <gtsam/nonlinear/ExpressionFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
+#include <gtsam_unstable/nonlinear/FixedLagSmoother.h>
+#include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/geometry/Pose3.h>
@@ -35,6 +37,10 @@
 using gtsam::symbol_shorthand::B; // Bias
 using gtsam::symbol_shorthand::V; // Velocity
 using gtsam::symbol_shorthand::X; // Pose
+using gtsam::symbol_shorthand::R; // Rotation
+using gtsam::symbol_shorthand::P; // point
+using gtsam::symbol_shorthand::G; // gps
+using gtsam::symbol_shorthand::T; // translation
 
 // Helper function declarations
 Eigen::Vector3d vector3(double x, double y, double z);
@@ -47,7 +53,7 @@ class FactorManager
 {
     public:
         FactorManager() = default;
-        FactorManager(const std::map<std::string, double>& config);
+        FactorManager(const std::map<std::string, double>& config, int64_t start_time);
         
         static boost::shared_ptr<gtsam::PreintegrationCombinedParams> defaultParams(double g);
         
@@ -71,56 +77,63 @@ class FactorManager
         T getKeyIndex();
 
     private:
-        std::map<std::string, double> config;
-        std::map<std::string, Eigen::MatrixXd> matrix_config;
+        // parameters
+        std::map<std::string, double> config_;
+        std::map<std::string, Eigen::MatrixXd> matrix_config_;
+        gtsam::ISAM2Params parameters_;
+        boost::shared_ptr<gtsam::PreintegrationCombinedParams> params_;
         
-        Eigen::Vector3d gravity_vec;
-        Eigen::MatrixXd bias_estimate_vec;
+        // IMU
+        Eigen::Vector3d gravity_vec_;
+        Eigen::MatrixXd bias_estimate_vec_;
+        Eigen::Matrix3d imu2body_;
         
-        int init_counter;
-        Eigen::Matrix3d imu2body;
+        int init_counter_;
         
-        bool _initialized;
-        bool _gps_initialized;        
-        gtsam::Key _key_index;
-    
-        double _lastOptimizeTime;
-        double _lastImuTime;
-        double _last_gps_time;
+        gtsam::imuBias::ConstantBias bias_;
+        boost::shared_ptr<gtsam::PreintegratedCombinedMeasurements> pim_;
+        boost::shared_ptr<gtsam::PreintegratedCombinedMeasurements> pim_copy_;
 
-        ImuBuffer _imu_buffer;
+        ImuBuffer imu_buffer_;
 
-        boost::shared_ptr<gtsam::PreintegrationCombinedParams> params;
-        
-        gtsam::noiseModel::Isotropic::shared_ptr _prior_noise;
-        gtsam::noiseModel::Isotropic::shared_ptr _odom_noise;
-        gtsam::noiseModel::Isotropic::shared_ptr _gps_noise;
-        gtsam::noiseModel::Isotropic::shared_ptr _heading_noise;
-        gtsam::ExpressionFactorGraph _graph;
-        gtsam::GaussNewtonParams _params;
-        gtsam::Values _initials;
-        gtsam::ISAM2Params _parameters;
-        gtsam::ISAM2 _isam;
-        
-        Eigen::Vector4d _orientation;
-        
-        gtsam::Point3 _translation;
-        gtsam::Pose3 optimized_pose;
-        gtsam::Point3 last_velocity;
-	    gtsam::Matrix last_marginal_covariance;
-        gtsam::imuBias::ConstantBias bias;
-        
-        boost::shared_ptr<gtsam::PreintegratedCombinedMeasurements> pim;
-        boost::shared_ptr<gtsam::PreintegratedCombinedMeasurements> pim_copy;
-        
-        gtsam::Rot3 initial_orientation;
-        gtsam::Pose3 navstate_pose;
-        gtsam::NavState init_navstate;
-        gtsam::NavState lastNavState;
-        gtsam::GaussNewtonOptimizer* _optimizer;
-        
-        Eigen::Vector3d _last_accel_meas;
-        Eigen::Vector3d _last_gyro_meas;
-    	Eigen::Vector4d _orient;
+        // noise
+        gtsam::noiseModel::Isotropic::shared_ptr prior_noise_;
+        gtsam::noiseModel::Isotropic::shared_ptr odom_noise_;
+        gtsam::noiseModel::Isotropic::shared_ptr gps_noise_;
+        gtsam::noiseModel::Base::shared_ptr utm_noise_;
+
+        // factor graph
+        gtsam::ExpressionFactorGraph graph_;
+        gtsam::Values initials_;
+        gtsam::Key key_index_;
+        gtsam::IncrementalFixedLagSmoother smoother_;
+        gtsam::FixedLagSmoother::KeyTimestampMap smoother_timestamps_;
+        gtsam::ISAM2 isam_;
+
+        // previous state
+        Eigen::Vector3d last_gps_;
+        gtsam::Point3 last_velocity_;
+        gtsam::Matrix last_marginal_covariance_;
+        gtsam::NavState last_nav_state_; 
+        Eigen::Vector3d last_accel_meas_;
+        Eigen::Vector3d last_gyro_meas_;
+        Eigen::Vector4d last_imu_orientation_;
+        gtsam::Pose3 last_optimized_pose_;
+        double last_optimize_time_;
+        double last_imu_time_;
+        double last_gps_time_;
+
+        // current state
+        Eigen::Vector4d orientation_;
+        Eigen::Vector3d translation_;
+        gtsam::Pose3 current_optimized_pose_;
+        gtsam::Pose3 current_navstate_pose_;
+        gtsam::Point3 current_velocity_;
+
+        // initialization
+        bool initialized_;
+        gtsam::Rot3 initial_orientation_;
+        gtsam::NavState initial_navstate_;
+
 };
 }

@@ -22,8 +22,8 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
 
     std::map<std::string, double> config;
     config = params.load<double>(path);
-
-    factor_manager_ = glider::FactorManager(config);
+    int64_t time_now = this->getTime(ros::Time::now());
+    factor_manager_ = glider::FactorManager(config, time_now);
 
     gps_sub_ = nh_.subscribe("/gps", 1, &FactorNode::gpsCallback, this);
     imu_sub_ = nh_.subscribe("/imu", 10, &FactorNode::imuCallback, this);
@@ -111,17 +111,20 @@ void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     int64_t timestamp;
     if (use_sim_time_)
     {
+        std::cout << "using sim time" << std::endl;
         timestamp = getTime(ros::Time::now());
     }
     else
     {
         timestamp = getTime(msg->header.stamp);
     }
-
+    //std::cout << "GPS timestamp " << timestamp << std::endl;
     factor_manager_.addGpsFactor(timestamp, gps_factor);
     //std::cout << "optimizing with time " << timestamp << std::endl;
-    auto [position, quaternion, rotation] = factor_manager_.runner();
-
+    if (true)
+    {
+        auto [position, quaternion, rotation] = factor_manager_.runner();
+    }
     if (!initialized_) initialized_ = true;
 }
 
@@ -151,7 +154,7 @@ void FactorNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
     {
         timestamp = getTime(msg->header.stamp);
     }
-
+    //std::cout << "IMU timestamp " << timestamp << std::endl;
     factor_manager_.addImuFactor(timestamp, accel, gyro, quat);
 }
 

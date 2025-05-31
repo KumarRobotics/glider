@@ -1,3 +1,2 @@
-use_sim_time: true
 rate: 100
 use_odom: true
