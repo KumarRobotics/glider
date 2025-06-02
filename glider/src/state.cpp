@@ -33,6 +33,11 @@ State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam
     this->heading = pose.rotation().yaw();
 }
 
+State::State(gtsam::Values& vals)
+{
+    // TODO
+}
+
 State State::Zero()
 {
     State state;

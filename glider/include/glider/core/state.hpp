@@ -29,6 +29,8 @@ struct State
     public:
         State() = default;
         State(gtsam::Values& val, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov);
+        State(gtsam::Values& val);
+        
         static State Zero();
 
         Eigen::Vector3d velocity;

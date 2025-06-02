@@ -48,7 +48,7 @@ FactorManager::FactorManager(const std::map<std::string, double>& config, int64_
     this->params_ = this->defaultParams(this->config_["gravity"]);
 
     this->prior_noise_ = gtsam::noiseModel::Isotropic::Sigma(6, this->config_["gps_noise"]);
-    this->odom_noise_ = gtsam::noiseModel::Isotropic::Sigma(6, this->config_["odom_noise"]);
+    this->odom_noise_ = gtsam::noiseModel::Isotropic::Sigma(6, this->config_["gps_noise"]);
     this->gps_noise_ = gtsam::noiseModel::Isotropic::Sigma(3, this->config_["gps_noise"]);
     this->heading_noise_ = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(M_PI/2, M_PI/2, this->config_["heading_noise"]));
 
@@ -140,10 +140,6 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         initial_navstate_ = gtsam::NavState(current_navstate_pose_, gtsam::Point3(0, 0, 0));
         last_nav_state_ = initial_navstate_;
         
-        //std::cout << "[GPS] adding pose keys " << gtsam::DefaultKeyFormatter(X(key_index_)) << std::endl; 
-        //std::cout << "[GPS] adding bias keys " << gtsam::DefaultKeyFormatter(B(key_index_)) << std::endl; 
-        //std::cout << "[GPS] adding vel keys  " << gtsam::DefaultKeyFormatter(V(key_index_)) << std::endl; 
-        //std::cout << "[GPS] adding rot keys  " << gtsam::DefaultKeyFormatter(R(key_index_)) << std::endl; 
         initials_.insert(X(key_index_), current_navstate_pose_);
         initials_.insert(V(key_index_), gtsam::Point3(0, 0, 0));
         initials_.insert(R(key_index_), initial_orientation_);
@@ -163,47 +159,9 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
     }
                                   
     if (key_index_ > 0) 
-    {
-	    //auto prediction = this->predict(timestamp);
-        //auto diff = (std::get<0>(prediction) - meas).norm();
-        //auto maxEllipseVal = last_marginal_covariance.diagonal().maxCoeff();
-        // Ensure that if GPS is greater than 5m away from prediction we discard it.
-        // If the covariance is very large, we will always include it
-        //if (diff > std::max(2.0 * maxEllipseVal, this->config["_gps_noise"])) 
-        //{
-        //    std::cout << "[GLIDER] Rejecting GPS within " << maxEllipseVal << " " << diff << std::endl;
-        //    _last_gps_time = nanosecInt2Float(timestamp);
-        //    pim->resetIntegration();
-        //    //_key_index++;
-        //    return 0;
-	    //}
-        
+    { 
         std::lock_guard<std::mutex> lock(std::mutex);
         
-        //if (imu_buffer_.size() < 5)
-        //{
-        //    std::cout << "error" << std::endl; 
-        //    return;
-        //}
-        //pim_->resetIntegration();
-        //std::vector<std::pair<double, ImuData>> measurements = imu_buffer_.get(last_gps_time_, timestamp_f); 
-        //for (size_t i = 0; i < measurements.size(); ++i)
-        //{
-        //    double dt;
-        //    if (i == 0) 
-        //    {
-        //        dt = measurements[i].first - last_gps_time_;
-        //    }
-        //    else
-        //    {
-        //        dt = measurements[i].first - measurements[i-1].first;
-        //    }
-        //    ImuData data = measurements[i].second;
-	    //    if (dt <= 0.) continue;
-
-        //    pim_->integrateMeasurement(data.accel, data.gyro, dt);
-        //}
-
         graph_.add(gtsam::CombinedImuFactor(X(key_index_),
                                             V(key_index_),
                                             X(key_index_-1),
@@ -212,16 +170,11 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
                                             B(key_index_-1),
                                             *pim_copy_));
         pim_copy_->resetIntegration();
-        //std::cout << "[GPS] adding pose keys " << gtsam::DefaultKeyFormatter(X(key_index_)) << std::endl; 
-        //std::cout << "[GPS] adding bias keys " << gtsam::DefaultKeyFormatter(B(key_index_)) << std::endl; 
-        //std::cout << "[GPS] adding vel keys  " << gtsam::DefaultKeyFormatter(V(key_index_)) << std::endl; 
-        //std::cout << "[GPS] adding rot keys  " << gtsam::DefaultKeyFormatter(R(key_index_)) << std::endl; 
     
         initials_.insert(X(key_index_), current_optimized_pose_);
         initials_.insert(V(key_index_), current_velocity_);
         initials_.insert(B(key_index_), bias_);
 
-        //std::cout << "[GPS] added initials" << std::endl;
         smoother_timestamps_[X(key_index_)] = timestamp_f;
         smoother_timestamps_[V(key_index_)] = timestamp_f;
         smoother_timestamps_[B(key_index_)] = timestamp_f;
@@ -231,13 +184,10 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
     if (heading_count_ == 4)
     {    
+        // add differential gps heading in ENU frame
         double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
-        //double heading = geodetics::gpsHeading(gps(0), gps(1), last_gps_(0), last_gps_(1));
         double enu_heading = geodetics::geodeticToENU(heading);
-        gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(enu_heading);
-        
-        //gtsam::Matrix3 mat_enu = NED2ENU * heading_rot.matrix() * NED2ENU.transpose();
-        //gtsam::Rot3 rot_enu(mat_enu);
+        gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(enu_heading);     
         graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
         last_gps_ = gps;
         
@@ -252,8 +202,12 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         heading_count_++;
     }
     
-    //std::cout << "Adding GPS factor and incrementing key" << std::endl;    
+    // Add gps factor in utm frame
     graph_.add(gtsam::GPSFactor(X(key_index_), gtsam::Point3(meas(0), meas(1), meas(2)), gps_noise_));
+
+    // add odom as between factor
+    double bearing = last_odom_.rotation().yaw();
+    double distance = last_odom_.translation().norm();
     //graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(X(key_index_-1), X(key_index_), last_odom_, odom_noise_));
     
     last_gps_time_ = timestamp_f;
@@ -273,30 +227,23 @@ void FactorManager::addOdometryFactor(int64_t timestamp, const Eigen::Vector3d& 
     }
 
     gtsam::Rot3 rotation = gtsam::Rot3::Quaternion(quat(0), quat(1), quat(2), quat(3));
-    gtsam::Pose3 meas(rotation, gtsam::Point3(pose(0), pose(1), pose(2)));
+    //gtsam::Pose3 meas(rotation, gtsam::Point3(pose(0), pose(1), pose(2)));
+    gtsam::Point3 local_t(pose(0), pose(1), pose(2));
+    gtsam::Point3 enu_t = current_optimized_pose_.rotation() * local_t;
 
-    gtsam::Rot3 r_heading = gtsam::Rot3::Yaw(current_heading_);
-    
-    gtsam::Point3 t = r_heading * meas.translation();
-    gtsam::Rot3 r = r_heading * meas.rotation();
-
-    gtsam::Pose3 enu_odom_meas(r, t);
+    gtsam::Pose3 meas(rotation, enu_t);
 
     if (compose_odom_)
     {
-        last_odom_ = last_odom_.compose(enu_odom_meas);
+        last_odom_ = last_odom_.compose(meas);
     }
     else
     {
-        last_odom_ = enu_odom_meas;
+        last_odom_ = meas;
         compose_odom_ = true;
     }
 }
 
-void FactorManager::addHeadingFactor(int64_t timestamp, const double& delta_heading)
-{
-    // TODO: move from gps factor to here.
-}
 
 void FactorManager::addImuFactor(int64_t timestamp, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro, const Eigen::Vector4d& orient) 
 {
@@ -317,7 +264,6 @@ void FactorManager::addImuFactor(int64_t timestamp, const Eigen::Vector3d& accel
     Eigen::Vector3d accel_meas = accel;
     Eigen::Vector3d gyro_meas = gyro;
     double dt = nanosecInt2Float(timestamp) - last_imu_time_;
-    //std::cout << "dt: " << dt << std::endl;
     if (dt <=0) return;
     
     pim_copy_->integrateMeasurement(accel_meas, gyro_meas, dt);
@@ -362,8 +308,7 @@ gtsam::Values FactorManager::optimize()
     {
         return gtsam::Values();
     }
-     
-
+    
     //last_marginal_covariance = _isam.marginalCovariance(X(_key_index-1));
     
     //std::cout << "=== DEBUGGING SMOOTHER KEYS ===" << std::endl;
@@ -412,8 +357,9 @@ gtsam::Values FactorManager::optimize()
     //std::cout << std::endl;
 
     //graph_.print();
-    //// end debug output
     //std::cout << "graph size: " << graph_.size() << " initials size: " << initials_.size() << std::endl;
+    //// end debug output
+    
     if (graph_.size() == 0 || initials_.size() == 0)
     {
         std::cout << "[GLIDER] No factors or initials, skipping optimization" << std::endl;
@@ -455,7 +401,6 @@ State FactorManager::runner()
     {
         State::Zero();
     }
-    //std::cout << "Running" << std::endl;
     if (key_index_ > 1)
     {
         gtsam::Values result = optimize();
@@ -468,7 +413,6 @@ State FactorManager::runner()
         
         pim_->resetIntegration();
         pim_copy_->resetIntegration();
-        //std::cout << "here" << std::endl;
         gtsam::Pose3 optimized_pose = result.at<gtsam::Pose3>(X(key_index_-1));
         this->current_optimized_pose_ = optimized_pose;
         this->current_velocity_ = result.at<gtsam::Point3>(V(key_index_-1));    
