@@ -22,12 +22,32 @@ double gpsHeading(double lat1, double lon1, double lat2, double lon2)
     double y = std::sin(lon_diff) * std::cos(lat2_rad);
     double x = std::cos(lat1_rad) * std::sin(lat2_rad) - std::sin(lat1_rad) * std::cos(lat2_rad) * std::cos(lon_diff);
 
-    double heading_rad = std::atan2(y, x);
-    double heading_deg = heading_rad * (180.0 / M_PI);
-    double heading_normalized = std::fmod(heading_deg + 360.0, 360);
+    double heading_rad = std::atan2(y,x);
 
-    return heading_normalized;
+    return heading_rad;
 }
 
+double headingRadiansToDegrees(double heading, bool use_enu = true)
+{
+    double heading_deg = heading * (180.0 / M_PI);
+    
+    if (heading_deg < 0.0)
+    {
+        heading_deg = heading_deg + 360.0;
+    }
+    else if (heading_deg > 360.0)
+    {
+        heading_deg = heading_deg - 360.0;
+    }
+
+    return heading_deg;
+}
+
+double geodeticToENU(double geodetic_heading)
+{
+    double enu_heading = std::fmod((M_PI/2 - geodetic_heading + (2*M_PI)), (2*M_PI));
+    
+    return enu_heading;
+}
 } // namespace geodetics
 } // namespace glider

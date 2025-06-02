@@ -9,6 +9,11 @@
 FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
 {
     double freq;
+    ned_to_enu_ = (Eigen::Matrix3d() << 
+                 0.0, 1.0, 0.0,
+                 1.0, 0.0, 0.0,
+                 0.0, 0.0, -1.0).finished();
+
     nh_.getParam("/glider_node/rate", freq);
     ROS_DEBUG_STREAM("Useing prediction rate: "<< freq);
     
@@ -81,7 +86,7 @@ void FactorNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
                                      msg->pose.pose.position.z);
     glider::Quaternion current_quat(msg->pose.pose.orientation);
 
-    Eigen::Vector3d between_position = (current_position - prev_position_).array().abs();
+    Eigen::Vector3d between_position = (current_position - prev_position_);
     glider::Quaternion between_quat = current_quat - prev_quat_;
 
     int64_t timestamp;
@@ -121,10 +126,10 @@ void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     //std::cout << "GPS timestamp " << timestamp << std::endl;
     factor_manager_.addGpsFactor(timestamp, gps_factor);
     //std::cout << "optimizing with time " << timestamp << std::endl;
-    if (true)
-    {
-        auto [position, quaternion, rotation] = factor_manager_.runner();
-    }
+    
+    glider::State state = factor_manager_.runner();
+    //auto [position, quaternion, rotation] = factor_manager_.runner();
+    std::cout << "[GLIDER] Heading: " << state.getHeadingDegrees() << std::endl;    
     if (!initialized_) initialized_ = true;
 }
 
@@ -140,10 +145,18 @@ void FactorNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
                           msg->linear_acceleration.y,
                           msg->linear_acceleration.z);
     
-    Eigen::Vector4d quat(msg->orientation.w,
-                         msg->orientation.x,
-                         msg->orientation.y,
-                         msg->orientation.z);
+    //glider::Quaternion quat(msg->orientation.w,
+    //                        msg->orientation.x,
+    //                        msg->orientation.y,
+    //                        msg->orientation.z);
+    Eigen::Quaterniond quat(msg->orientation.w,
+                            msg->orientation.x,
+                            msg->orientation.y,
+                            msg->orientation.z);
+
+    Eigen::Matrix3d rot_enu = ned_to_enu_ * quat.toRotationMatrix() * ned_to_enu_.transpose();
+    quat = Eigen::Quaterniond(rot_enu);
+    quat.normalize();
 
     int64_t timestamp;
     if (use_sim_time_)
@@ -155,7 +168,8 @@ void FactorNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
         timestamp = getTime(msg->header.stamp);
     }
     //std::cout << "IMU timestamp " << timestamp << std::endl;
-    factor_manager_.addImuFactor(timestamp, accel, gyro, quat);
+    Eigen::Vector4d q_vec(quat.w(), quat.x(), quat.y(), quat.z());
+    factor_manager_.addImuFactor(timestamp, accel, gyro, q_vec);
 }
 
 

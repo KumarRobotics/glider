@@ -24,6 +24,7 @@
 #include <gtsam/slam/InitializePose3.h>
 
 #include "imu_buffer.hpp"
+#include "state.hpp"
 
 #include <Eigen/Dense>
 #include <iostream>
@@ -68,7 +69,7 @@ class FactorManager
         void addHeadingFactor(int64_t timestamp, const double& heading);
 
         gtsam::Values optimize();  
-        std::tuple<Eigen::Vector3d, Eigen::Vector4d, Eigen::Matrix3d> runner();
+        State runner();
 
         gtsam::ExpressionFactorGraph getGraph();
         bool isInitialized();
@@ -119,6 +120,7 @@ class FactorManager
         Eigen::Vector3d last_gyro_meas_;
         Eigen::Vector4d last_imu_orientation_;
         gtsam::Pose3 last_optimized_pose_;
+        gtsam::Pose3 last_odom_;
         double last_optimize_time_;
         double last_imu_time_;
         double last_gps_time_;
@@ -129,11 +131,18 @@ class FactorManager
         gtsam::Pose3 current_optimized_pose_;
         gtsam::Pose3 current_navstate_pose_;
         gtsam::Point3 current_velocity_;
+        double current_heading_;
 
         // initialization
         bool initialized_;
+        bool compose_odom_;
+        uint8_t heading_count_;
         gtsam::Rot3 initial_orientation_;
         gtsam::NavState initial_navstate_;
 
+        State current_state_;
+        State last_state_;
+
+        gtsam::Matrix3 NED2ENU;
 };
 }

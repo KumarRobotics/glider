@@ -17,12 +17,6 @@ Eigen::Vector3d vector3(double x, double y, double z)
     return Eigen::Vector3d(x, y, z);
 }
 
-const Eigen::Matrix3d NED2ENU = (Eigen::Matrix3d() << 
-    0.0, 1.0, 0.0,
-    1.0, 0.0, 0.0,
-    0.0, 0.0, -1.0
-).finished();
-
 double nanosecInt2Float(int64_t timestamp)
 {
     return timestamp * 1e-9;
@@ -36,11 +30,17 @@ FactorManager::FactorManager(const std::map<std::string, double>& config, int64_
         this->config_[kv.first] = kv.second;
     }
 
+    this->NED2ENU << 0.0, 1.0, 0.0, 
+                     1.0, 0.0, 0.0, 
+                     0.0, 0.0, -1.0;
+
+
     this->gravity_vec_ = Eigen::Vector3d(0.0, 0.0, this->config_["gravity"]);
     this->bias_estimate_vec_ = Eigen::MatrixXd::Zero(static_cast<int>(this->config_["bias_num_measurements"]), 6);
     this->init_counter_ = 0;
     this->imu2body_ = Eigen::Matrix3d::Identity();
-    
+   
+    this->heading_count_ = 0;
     this->initialized_ = false;
     this->key_index_ = 0;
     this->last_optimize_time_ = 0.0;
@@ -65,6 +65,7 @@ FactorManager::FactorManager(const std::map<std::string, double>& config, int64_
     this->last_velocity_ = gtsam::Point3(0, 0, 0);
 
     this->imu_buffer_ = ImuBuffer(1000);
+    this->compose_odom_ = false;
 
     std::cout << "[GLIDER] Factor Manager Initialized" << std::endl;
 }
@@ -102,10 +103,12 @@ void FactorManager::imuInitialize(const Eigen::Vector3d& accel_meas, const Eigen
         
         // GTSAM expects quaternion as w,x,y,z
         gtsam::Rot3 rot = gtsam::Rot3::Quaternion(orient(0), orient(1), orient(2), orient(3));
-        
+        //rot = NED2ENU * rot;
         Eigen::Matrix3d init_orient_matrix = imu2body_ * rot.matrix();
         initial_orientation_ = gtsam::Rot3(init_orient_matrix);
-       
+        current_heading_ = initial_orientation_.yaw(); 
+        double heading_deg = ((current_heading_*180.0) / M_PI) + 360.0;
+        std::cout << "[GLIDER] Initialized IMU with heading: " << heading_deg << std::endl;
         initialized_ = true;
     }
 }
@@ -137,10 +140,10 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         initial_navstate_ = gtsam::NavState(current_navstate_pose_, gtsam::Point3(0, 0, 0));
         last_nav_state_ = initial_navstate_;
         
-        std::cout << "[GPS] adding pose keys " << gtsam::DefaultKeyFormatter(X(key_index_)) << std::endl; 
-        std::cout << "[GPS] adding bias keys " << gtsam::DefaultKeyFormatter(B(key_index_)) << std::endl; 
-        std::cout << "[GPS] adding vel keys  " << gtsam::DefaultKeyFormatter(V(key_index_)) << std::endl; 
-        std::cout << "[GPS] adding rot keys  " << gtsam::DefaultKeyFormatter(R(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding pose keys " << gtsam::DefaultKeyFormatter(X(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding bias keys " << gtsam::DefaultKeyFormatter(B(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding vel keys  " << gtsam::DefaultKeyFormatter(V(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding rot keys  " << gtsam::DefaultKeyFormatter(R(key_index_)) << std::endl; 
         initials_.insert(X(key_index_), current_navstate_pose_);
         initials_.insert(V(key_index_), gtsam::Point3(0, 0, 0));
         initials_.insert(R(key_index_), initial_orientation_);
@@ -209,16 +212,16 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
                                             B(key_index_-1),
                                             *pim_copy_));
         pim_copy_->resetIntegration();
-        std::cout << "[GPS] adding pose keys " << gtsam::DefaultKeyFormatter(X(key_index_)) << std::endl; 
-        std::cout << "[GPS] adding bias keys " << gtsam::DefaultKeyFormatter(B(key_index_)) << std::endl; 
-        std::cout << "[GPS] adding vel keys  " << gtsam::DefaultKeyFormatter(V(key_index_)) << std::endl; 
-        std::cout << "[GPS] adding rot keys  " << gtsam::DefaultKeyFormatter(R(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding pose keys " << gtsam::DefaultKeyFormatter(X(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding bias keys " << gtsam::DefaultKeyFormatter(B(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding vel keys  " << gtsam::DefaultKeyFormatter(V(key_index_)) << std::endl; 
+        //std::cout << "[GPS] adding rot keys  " << gtsam::DefaultKeyFormatter(R(key_index_)) << std::endl; 
     
         initials_.insert(X(key_index_), current_optimized_pose_);
         initials_.insert(V(key_index_), current_velocity_);
         initials_.insert(B(key_index_), bias_);
 
-        std::cout << "[GPS] added initials" << std::endl;
+        //std::cout << "[GPS] added initials" << std::endl;
         smoother_timestamps_[X(key_index_)] = timestamp_f;
         smoother_timestamps_[V(key_index_)] = timestamp_f;
         smoother_timestamps_[B(key_index_)] = timestamp_f;
@@ -226,16 +229,35 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
     }
 
-    double heading = geodetics::gpsHeading(gps(0), gps(1), last_gps_(0), last_gps_(1));
-    gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(heading);
-    gtsam::Point3 utm_point(meas(0), meas(1), meas(2));
-    gtsam::Pose3 utm_pose(heading_rot, utm_point);
+    if (heading_count_ == 4)
+    {    
+        double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
+        //double heading = geodetics::gpsHeading(gps(0), gps(1), last_gps_(0), last_gps_(1));
+        double enu_heading = geodetics::geodeticToENU(heading);
+        gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(enu_heading);
+        
+        //gtsam::Matrix3 mat_enu = NED2ENU * heading_rot.matrix() * NED2ENU.transpose();
+        //gtsam::Rot3 rot_enu(mat_enu);
+        graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
+        last_gps_ = gps;
+        
+        gtsam::Quaternion q_temp(last_imu_orientation_(0), last_imu_orientation_(1), last_imu_orientation_(2), last_imu_orientation_(3));
+        gtsam::Rot3 rot(q_temp);
+        std::cout << "IMU heading: " << geodetics::headingRadiansToDegrees(rot.yaw()) << std::endl;
+        std::cout << "Differential GPS Heading: " << geodetics::headingRadiansToDegrees(heading_rot.yaw()) << std::endl;
+        heading_count_ = 0;
+    }
+    else
+    {
+        heading_count_++;
+    }
     
-    std::cout << "Adding GPS factor and incrementing key" << std::endl;    
+    //std::cout << "Adding GPS factor and incrementing key" << std::endl;    
     graph_.add(gtsam::GPSFactor(X(key_index_), gtsam::Point3(meas(0), meas(1), meas(2)), gps_noise_));
-    graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
+    //graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(X(key_index_-1), X(key_index_), last_odom_, odom_noise_));
+    
     last_gps_time_ = timestamp_f;
-    last_gps_ = gps;
+    compose_odom_ = false;
     
     key_index_++;
 
@@ -248,6 +270,26 @@ void FactorManager::addOdometryFactor(int64_t timestamp, const Eigen::Vector3d& 
     if (!initialized_ || key_index_ == 0) 
     {
         return;
+    }
+
+    gtsam::Rot3 rotation = gtsam::Rot3::Quaternion(quat(0), quat(1), quat(2), quat(3));
+    gtsam::Pose3 meas(rotation, gtsam::Point3(pose(0), pose(1), pose(2)));
+
+    gtsam::Rot3 r_heading = gtsam::Rot3::Yaw(current_heading_);
+    
+    gtsam::Point3 t = r_heading * meas.translation();
+    gtsam::Rot3 r = r_heading * meas.rotation();
+
+    gtsam::Pose3 enu_odom_meas(r, t);
+
+    if (compose_odom_)
+    {
+        last_odom_ = last_odom_.compose(enu_odom_meas);
+    }
+    else
+    {
+        last_odom_ = enu_odom_meas;
+        compose_odom_ = true;
     }
 }
 
@@ -267,6 +309,7 @@ void FactorManager::addImuFactor(int64_t timestamp, const Eigen::Vector3d& accel
     }
    
     double timestamp_f = nanosecInt2Float(timestamp);
+    gtsam::Quaternion q(orient(0), orient(1), orient(2), orient(3));
 
     std::lock_guard<std::mutex> lock(std::mutex);
     imu_buffer_.add(timestamp_f, accel, gyro, orient);
@@ -295,11 +338,6 @@ std::tuple<Eigen::Vector3d, Eigen::Vector4d> FactorManager::predict(int64_t time
     gtsam::NavState navstate(current_optimized_pose_, last_velocity_);
     gtsam::NavState result = pim_copy_->predict(navstate, bias_);
 
-    // reset the graph
-    //initials_.clear();
-    //smoother_timestamps_.clear();
-    //graph_.resize(0);
-    
     gtsam::Rot3 rotation = result.attitude();
     gtsam::Point3 translation = result.position();
     gtsam::Quaternion quat = rotation.toQuaternion();
@@ -328,54 +366,54 @@ gtsam::Values FactorManager::optimize()
 
     //last_marginal_covariance = _isam.marginalCovariance(X(_key_index-1));
     
-    std::cout << "=== DEBUGGING SMOOTHER KEYS ===" << std::endl;
-    
-    // Debug initial values
-    std::cout << "Keys in _initials: ";
-    for (const auto& key_value : initials_) {
-        std::cout << gtsam::DefaultKeyFormatter(key_value.key) << " ";
-    }
-    std::cout << std::endl;
-    
-    // Debug timestamps
-    std::cout << "Keys with timestamps: ";
-    for (const auto& kv : smoother_timestamps_) {
-        std::cout << gtsam::DefaultKeyFormatter(kv.first) << " ";
-    }
-    std::cout << std::endl;
-    
-    // Debug factor keys
-    std::cout << "Keys referenced in factors: ";
-    std::set<gtsam::Key> factor_keys;
-    for (const auto& factor : graph_) {
-        for (gtsam::Key key : factor->keys()) {
-            factor_keys.insert(key);
-            std::cout << gtsam::DefaultKeyFormatter(key) << " ";
-        }
-    }
-    std::cout << std::endl;
-    
-    // Check for missing keys
-    std::cout << "Missing keys (in factors but not in initials): ";
-    for (gtsam::Key key : factor_keys) {
-        if (!initials_.exists(key)) {
-            std::cout << gtsam::DefaultKeyFormatter(key) << " ";
-        }
-    }
-    std::cout << std::endl;
-    
-    // Check for missing timestamps
-    std::cout << "Missing timestamps (in factors but no timestamp): ";
-    for (gtsam::Key key : factor_keys) {
-        if (smoother_timestamps_.find(key) == smoother_timestamps_.end()) {
-            std::cout << gtsam::DefaultKeyFormatter(key) << " ";
-        }
-    }
-    std::cout << std::endl;
+    //std::cout << "=== DEBUGGING SMOOTHER KEYS ===" << std::endl;
+    //
+    //// Debug initial values
+    //std::cout << "Keys in _initials: ";
+    //for (const auto& key_value : initials_) {
+    //    std::cout << gtsam::DefaultKeyFormatter(key_value.key) << " ";
+    //}
+    //std::cout << std::endl;
+    //
+    //// Debug timestamps
+    //std::cout << "Keys with timestamps: ";
+    //for (const auto& kv : smoother_timestamps_) {
+    //    std::cout << gtsam::DefaultKeyFormatter(kv.first) << " ";
+    //}
+    //std::cout << std::endl;
+    //
+    //// Debug factor keys
+    //std::cout << "Keys referenced in factors: ";
+    //std::set<gtsam::Key> factor_keys;
+    //for (const auto& factor : graph_) {
+    //    for (gtsam::Key key : factor->keys()) {
+    //        factor_keys.insert(key);
+    //        std::cout << gtsam::DefaultKeyFormatter(key) << " ";
+    //    }
+    //}
+    //std::cout << std::endl;
+    //
+    //// Check for missing keys
+    //std::cout << "Missing keys (in factors but not in initials): ";
+    //for (gtsam::Key key : factor_keys) {
+    //    if (!initials_.exists(key)) {
+    //        std::cout << gtsam::DefaultKeyFormatter(key) << " ";
+    //    }
+    //}
+    //std::cout << std::endl;
+    //
+    //// Check for missing timestamps
+    //std::cout << "Missing timestamps (in factors but no timestamp): ";
+    //for (gtsam::Key key : factor_keys) {
+    //    if (smoother_timestamps_.find(key) == smoother_timestamps_.end()) {
+    //        std::cout << gtsam::DefaultKeyFormatter(key) << " ";
+    //    }
+    //}
+    //std::cout << std::endl;
 
-    graph_.print();
-    // end debug output
-    std::cout << "graph size: " << graph_.size() << " initials size: " << initials_.size() << std::endl;
+    //graph_.print();
+    //// end debug output
+    //std::cout << "graph size: " << graph_.size() << " initials size: " << initials_.size() << std::endl;
     if (graph_.size() == 0 || initials_.size() == 0)
     {
         std::cout << "[GLIDER] No factors or initials, skipping optimization" << std::endl;
@@ -390,7 +428,7 @@ gtsam::Values FactorManager::optimize()
         }
         catch (const std::exception& e)
         {
-            std::cout << "No current estimate" << std::endl;
+            std::cout << "[GLIDER] No current estimate" << std::endl;
             return gtsam::Values();
         }
     }
@@ -411,19 +449,26 @@ gtsam::Values FactorManager::optimize()
     return result;
 }
 
-std::tuple<Eigen::Vector3d, Eigen::Vector4d, Eigen::Matrix3d> FactorManager::runner() 
+State FactorManager::runner() 
 {
     if (!initialized_) 
     {
-        return std::make_tuple(Eigen::Vector3d::Zero(), Eigen::Vector4d::Zero(), Eigen::Matrix3d::Zero());
+        State::Zero();
     }
     //std::cout << "Running" << std::endl;
     if (key_index_ > 1)
     {
         gtsam::Values result = optimize();
+        
+        last_state_ = current_state_;
+        
+        gtsam::Matrix pose_cov = isam_.marginalCovariance(X(key_index_-1));
+        gtsam::Matrix vel_cov = isam_.marginalCovariance(V(key_index_-1));
+        current_state_ = State(result, key_index_-1, pose_cov, vel_cov);
+        
         pim_->resetIntegration();
         pim_copy_->resetIntegration();
-        std::cout << "here" << std::endl;
+        //std::cout << "here" << std::endl;
         gtsam::Pose3 optimized_pose = result.at<gtsam::Pose3>(X(key_index_-1));
         this->current_optimized_pose_ = optimized_pose;
         this->current_velocity_ = result.at<gtsam::Point3>(V(key_index_-1));    
@@ -449,12 +494,13 @@ std::tuple<Eigen::Vector3d, Eigen::Vector4d, Eigen::Matrix3d> FactorManager::run
         
         orientation_ = quaternion;
         translation_ = translation;
+        current_heading_ = rotation.yaw();
 
-        return std::make_tuple(Eigen::Vector3d(translation.x(), translation.y(), translation.z()), quaternion, rotation.matrix());
+        return current_state_;
     }
     else
     {
-        return std::make_tuple(Eigen::Vector3d(), Eigen::Vector4d(), Eigen::Matrix3d());
+        return State::Zero();
     }
 }
 

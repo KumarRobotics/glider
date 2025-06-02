@@ -11,6 +11,7 @@
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Time.h>
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include "glider/core/factor_manager.hpp"
 #include "glider/utils/params.hpp"
@@ -47,4 +48,6 @@ class FactorNode
 
         glider::Quaternion prev_quat_;
         Eigen::Vector3d prev_position_;
+
+        Eigen::Matrix3d ned_to_enu_;
 };

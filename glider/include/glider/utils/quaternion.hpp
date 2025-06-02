@@ -18,7 +18,9 @@ struct Quaternion
 
     friend Quaternion operator-(const Quaternion& q1, const Quaternion& q2);
     friend Quaternion operator*(const Quaternion& q1, const Quaternion& q2);
-    
+
+    static Quaternion fromRot3(Eigen::Matrix3d rot);
+
     Quaternion inverse() const;
     Quaternion conjugate() const;
 
