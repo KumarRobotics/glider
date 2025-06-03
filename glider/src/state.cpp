@@ -10,7 +10,7 @@
 
 using namespace glider;
 
-State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov)
+State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized)
 {
     gtsam::Pose3 pose = vals.at<gtsam::Pose3>(X(key));
     gtsam::Quaternion quat = pose.rotation().toQuaternion();
@@ -31,9 +31,12 @@ State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam
 
     this->altitude = pose.translation().z();
     this->heading = pose.rotation().yaw();
+
+    if (velocity.norm() > 0.01) this->is_moving = true;
+    this->is_initialized = initialized;
 }
 
-State::State(gtsam::Values& vals)
+State::State(gtsam::Values& vals, bool initialized)
 {
     // TODO
 }

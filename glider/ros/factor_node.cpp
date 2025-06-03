@@ -129,7 +129,7 @@ void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     
     glider::State state = factor_manager_.runner();
     //auto [position, quaternion, rotation] = factor_manager_.runner();
-    std::cout << "[GLIDER] Heading: " << state.getHeadingDegrees() << std::endl;    
+    //std::cout << "[GLIDER] Heading: " << state.getHeadingDegrees() << std::endl;    
     if (!initialized_) initialized_ = true;
 }
 

@@ -137,8 +137,10 @@ class FactorManager
         // initialization
         bool initialized_;
         bool compose_odom_;
+        uint8_t start_odom_;
         uint8_t heading_count_;
         gtsam::Rot3 initial_orientation_;
+        gtsam::Pose3 initial_pose_for_odom_;
         gtsam::NavState initial_navstate_;
 
         State current_state_;

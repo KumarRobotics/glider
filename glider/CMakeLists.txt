@@ -47,6 +47,7 @@ add_library(${PROJECT_NAME} SHARED
   src/params.cpp
   src/quaternion.cpp
   src/state.cpp
+  src/odom.cpp
   ros/factor_node.cpp
 )
 
