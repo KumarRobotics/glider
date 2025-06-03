@@ -28,9 +28,9 @@ sensor_msgs::NavSatFix toNavSatFix(glider::State& state, const char* zone)
 
     msg.latitude = latlon.first;
     msg.longitude = latlon.second;
-    msg.altitude = state.altitude;
-    std::copy(state.position_covariance.data(), 
-              state.position_covariance.data()+9, 
+    msg.altitude = state.getAltitude();
+    std::copy(state.getPositionCovariance().data(), 
+              state.getPositionCovariance().data()+9, 
               msg.position_covariance.begin());
 
     return msg;

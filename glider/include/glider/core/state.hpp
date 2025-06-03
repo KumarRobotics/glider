@@ -17,6 +17,8 @@
 #include <Eigen/Dense>
 #include <utility>
 
+#include "odometry.hpp"
+
 using gtsam::symbol_shorthand::B; // Bias
 using gtsam::symbol_shorthand::V; // Velocity
 using gtsam::symbol_shorthand::X; // Pose
@@ -24,47 +26,47 @@ using gtsam::symbol_shorthand::X; // Pose
 namespace glider
 {
 
-struct State
+
+class State : public Odometry
 {
     public:
         State() = default;
+        State(bool initialized);
         State(gtsam::Values& val, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized);
         State(gtsam::Values& val, bool initialized);
         
         static State Zero();
 
-        Eigen::Vector3d velocity;
-        Eigen::Vector3d position;
-        Eigen::Vector4d orientation;
-        Eigen::MatrixXd pose_covariance;
-        Eigen::MatrixXd position_covariance;
-        Eigen::MatrixXd velocity_covariance;
-        Eigen::Vector3d accelerometer_bias;
-        Eigen::Vector3d gyroscope_bias;
-
-        int key_index;
-
-        double altitude;
-        double heading;
-
-        double getHeadingDegrees() const;
-        double getLatitude(const char* zone);
-        double getLongitude(const char* zone);
-        std::pair<double, double> getLatLon(const char* zone);
+        template<typename T>
+        T getBias() const;
+        template<typename T>
+        T getAccelerometerBias() const;
+        template<typename T>
+        T getGyroscopeBias() const;
+        template<typename T>
+        T getKeyIndex() const;
+        
+        Eigen::MatrixXd getPoseCovariance() const;
+        Eigen::MatrixXd getPositionCovariance() const;
+        Eigen::MatrixXd getVelocityCovariance() const;
+        
+        std::string getKeyIndex(const char* symbol);
 
         bool isMoving() const;
         bool isInitialized() const;
 
-        void setLatitude(const double lat);
-        void setLongitude(const double lon);
-        void setMovingStatus(const bool status);
-        void setInitializedStatus(const bool status);
-
     private:
-        double latitude;
-        double longitude;
+
+        bool is_moving_;
+        bool is_initialized_;
         
-        bool is_moving;
-        bool is_initialized;
+        gtsam::Vector3 accelerometer_bias_;
+        gtsam::Vector3 gyroscope_bias_;
+
+        gtsam::Matrix pose_covariance_;
+        gtsam::Matrix position_covariance_;
+        gtsam::Matrix velocity_covariance_;
+
+        gtsam::Key key_index_;
 };
 } // namespace glider

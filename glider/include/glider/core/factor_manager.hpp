@@ -22,7 +22,6 @@
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/navigation/NavState.h>
 #include <gtsam/slam/InitializePose3.h>
-#include <gtsam/slam/RangeFactor.h>
 
 #include "imu_buffer.hpp"
 #include "state.hpp"
