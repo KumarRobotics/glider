@@ -142,12 +142,10 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         
         initials_.insert(X(key_index_), current_navstate_pose_);
         initials_.insert(V(key_index_), gtsam::Point3(0, 0, 0));
-        initials_.insert(R(key_index_), initial_orientation_);
         initials_.insert(B(key_index_), bias_);
 
         smoother_timestamps_[X(key_index_)] = timestamp_f;
         smoother_timestamps_[V(key_index_)] = timestamp_f;
-        smoother_timestamps_[R(key_index_)] = timestamp_f;
         smoother_timestamps_[B(key_index_)] = timestamp_f;
 
         graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(key_index_), current_navstate_pose_, gtsam::noiseModel::Isotropic::Sigma(6, 0.001)));
@@ -177,7 +175,6 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
         smoother_timestamps_[X(key_index_)] = timestamp_f;
         smoother_timestamps_[V(key_index_)] = timestamp_f;
-        smoother_timestamps_[B(key_index_)] = timestamp_f;
         smoother_timestamps_[R(key_index_)] = timestamp_f;
 
     }
@@ -188,17 +185,18 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         {
             // add differential gps heading in ENU frame
             std::cout << "Adding differential gps" << std::endl;
+
             double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
             double enu_heading = geodetics::geodeticToENU(heading);
             gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(enu_heading);     
+            
             graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
             last_gps_ = gps;
+
+            // once we have a good heading from dgps, we can
+            // more accurately rotate the odom to enu frame
             if (start_odom_ == 0) start_odom_ = 1;
         }
-        //gtsam::Quaternion q_temp(last_imu_orientation_(0), last_imu_orientation_(1), last_imu_orientation_(2), last_imu_orientation_(3));
-        //gtsam::Rot3 rot(q_temp);
-        //std::cout << "IMU heading: " << geodetics::headingRadiansToDegrees(rot.yaw()) << std::endl;
-        //std::cout << "Differential GPS Heading: " << geodetics::headingRadiansToDegrees(heading_rot.yaw()) << std::endl;
         heading_count_ = 0;
     }
     else
@@ -212,11 +210,13 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
     if (start_odom_ == 2)
     {
         std::cout << "Adding between factor from odometry" << std::endl;
+        // Add a between factor from composed odom
         graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(X(key_index_-1), X(key_index_), last_odom_, odom_noise_));
+        compose_odom_ = false;
     }
 
+    // save timestamp, reset odom, increment key
     last_gps_time_ = timestamp_f;
-    compose_odom_ = false;
     
     key_index_++;
 
@@ -226,31 +226,30 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
 void FactorManager::addOdometryFactor(int64_t timestamp, const Eigen::Vector3d& pose, const Eigen::Vector4d& quat) 
 {
-    if (!initialized_ || key_index_ == 0) 
+    // wait until the start odom flag is 2 
+    if (start_odom_ != 2) 
     {
         return;
     }
 
     gtsam::Rot3 local_r = gtsam::Rot3::Quaternion(quat(0), quat(1), quat(2), quat(3));
     gtsam::Point3 local_t(pose(0), pose(1), pose(2));
-    gtsam::Rot3 enu_r;
-    gtsam::Point3 enu_t;
-    if (start_odom_ == 2)
-    {
-        enu_r = initial_pose_for_odom_.rotation() * local_r; 
-        enu_t = initial_pose_for_odom_.rotation() * local_t;
     
-        gtsam::Pose3 meas(enu_r, enu_t);
+    gtsam::Rot3 enu_r = initial_pose_for_odom_.rotation() * local_r; 
+    gtsam::Point3 enu_t = initial_pose_for_odom_.rotation() * local_t;
+    
+    gtsam::Pose3 meas(enu_r, enu_t);
 
-        if (compose_odom_)
-        {
-            last_odom_ = last_odom_.compose(meas);
-        }
-        else
-        {
-            last_odom_ = meas;
-            compose_odom_ = true;
-        }
+    // the compose odom flag is false in the constructor
+    // and set to false everytime we add a between factor
+    if (compose_odom_)
+    {
+        last_odom_ = last_odom_.compose(meas);
+    }
+    else
+    {
+        last_odom_ = meas;
+        compose_odom_ = true;
     }
 }
 
@@ -420,7 +419,6 @@ State FactorManager::runner()
         gtsam::Matrix pose_cov = isam_.marginalCovariance(X(key_index_-1));
         gtsam::Matrix vel_cov = isam_.marginalCovariance(V(key_index_-1));
         current_state_ = State(result, key_index_-1, pose_cov, vel_cov, true);
-        
 
         pim_->resetIntegration();
         pim_copy_->resetIntegration();
@@ -431,23 +429,23 @@ State FactorManager::runner()
         
         if (start_odom_ == 1)
         {
+            std::cout << "[GLIDER] Starting to fuse differential GPS" << std::endl;
+            std::cout << "[GLIDER] Starting to fuse odometry" << std::endl;
             initial_pose_for_odom_ = optimized_pose;
             start_odom_ = 2;
         }
 
-        //std::cout << "here1" << std::endl;
         if (key_index_ > 1)
         {
-            //std::cout<<"getting -2 pose" << std::endl;
             this->last_optimized_pose_ = result.at<gtsam::Pose3>(X(key_index_-2));
             this->last_velocity_ = result.at<gtsam::Point3>(V(key_index_-2));
         }
         else
         {
-            this->last_optimized_pose_ = gtsam::Pose3(); //optimized_pose;
-            this->last_velocity_ = gtsam::Point3(0.0, 0.0, 0.0);//current_velocity_;
+            this->last_optimized_pose_ = gtsam::Pose3();
+            this->last_velocity_ = gtsam::Point3(0.0, 0.0, 0.0);
         }
-        //std::cout<<"here2"<<std::endl;
+
         gtsam::Rot3 rotation = optimized_pose.rotation();
         gtsam::Point3 translation = optimized_pose.translation();
 
