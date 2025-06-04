@@ -2,6 +2,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Header.h>
 
 #include "glider/core/state.hpp"
 
@@ -21,6 +22,15 @@ ros::Duration hzToDuration(double freq)
     return ros::Duration(period_seconds);
 }
 
+std_msgs::Header getHeader(std::string frame_id)
+{
+    std_msgs::Header msg;
+    msg.stamp = ros::Time::now();
+    msg.frame_id = frame_id;
+
+    return msg;
+}
+
 template <typename T>
 T toRosMsg(glider::State& state, const char* zone = nullptr)
 {
@@ -38,9 +48,16 @@ T toRosMsg(glider::State& state, const char* zone = nullptr)
             msg.latitude = latlon.first;
             msg.longitude = latlon.second;
             msg.altitude = state.getAltitude();
-            std::copy(state.getPositionCovariance().data(), 
-                      state.getPositionCovariance().data()+9, 
-                      msg.position_covariance.begin());
+            msg.position_covariance_type = 3;
+            Eigen::Matrix3d cov = state.getPositionCovariance();
+            for (int i = 0; i < cov.rows(); ++i) 
+            {
+                for (int j = 0; j < cov.cols(); ++j) 
+                {
+                    msg.position_covariance[i * 3 + j] = cov(i, j);
+                }
+            }
+            msg.header = getHeader("enu");
         }
         return msg;
     }
@@ -59,19 +76,31 @@ T toRosMsg(glider::State& state, const char* zone = nullptr)
         msg.pose.pose.orientation.y = q.y();
         msg.pose.pose.orientation.z = q.z();
 
-        std::copy(state.getPoseCovariance().data(),
-                  state.getPoseCovariance().data()+36,
-                  msg.pose.covariance.begin());
+        Eigen::MatrixXd cov = state.getPoseCovariance();
+        for (int i = 0; i < cov.rows(); ++i) 
+        {
+            for (int j = 0; j < cov.cols(); ++j) 
+            {
+                msg.pose.covariance[i * cov.rows() + j] = cov(i, j);
+            }
+        }
 
         Eigen::Vector3d v = state.getVelocity<Eigen::Vector3d>();
 
         msg.twist.twist.linear.x = v(0);
         msg.twist.twist.linear.y = v(1);
         msg.twist.twist.linear.z = v(2);
+        
+        cov = state.getVelocityCovariance();
+        for (int i = 0; i < cov.rows(); ++i) 
+        {
+            for (int j = 0; j < cov.cols(); ++j) 
+            {
+                msg.twist.covariance[i * cov.rows() + j] = cov(i, j);
+            }
+        }
+        msg.header = getHeader("enu-utm");
 
-        std::copy(state.getVelocityCovariance().data(),
-                  state.getVelocityCovariance().data()+36,
-                  msg.twist.covariance.begin());
     }
     else
     {
@@ -97,6 +126,8 @@ T toRosMsg(glider::Odometry& odom, const char* zone = nullptr)
             msg.latitude = latlon.first;
             msg.longitude = latlon.second;
             msg.altitude = odom.getAltitude();
+            msg.position_covariance_type = 3;
+            msg.header = getHeader("enu");
         }
         return msg;
     }
@@ -120,6 +151,7 @@ T toRosMsg(glider::Odometry& odom, const char* zone = nullptr)
         msg.twist.twist.linear.x = v(0);
         msg.twist.twist.linear.y = v(1);
         msg.twist.twist.linear.z = v(2);
+        msg.header = getHeader("enu-utm");
 
         return msg;
     }
@@ -131,22 +163,37 @@ T toRosMsg(glider::Odometry& odom, const char* zone = nullptr)
 }
 
 template<typename T>
-T addCovariance(glider::State& state, T& msg)
+void addCovariance(glider::State& state, T& msg)
 {
     if constexpr (std::is_same_v<T, sensor_msgs::NavSatFix>)
-    { 
-        std::copy(state.getPositionCovariance().data(), 
-                  state.getPositionCovariance().data()+9, 
-                  msg.position_covariance.begin());
+    {
+        Eigen::Matrix3d cov = state.getPositionCovariance();
+        for (int i = 0; i < cov.rows(); ++i) 
+        {
+            for (int j = 0; j < cov.cols(); ++j) 
+            {
+                msg.position_covariance[i * 3 + j] = cov(i, j);
+            }
+        }
     }
     else if constexpr (std::is_same_v<T, nav_msgs::Odometry>)
     { 
-        std::copy(state.getPoseCovariance().data(),
-                  state.getPoseCovariance().data()+36,
-                  msg.pose.covariance.begin());
-        std::copy(state.getVelocityCovariance().data(),
-                  state.getVelocityCovariance().data()+36,
-                  msg.twist.covariance.begin());
+        Eigen::MatrixXd cov = state.getPoseCovariance();
+        for (int i = 0; i < cov.rows(); ++i) 
+        {
+            for (int j = 0; j < cov.cols(); ++j) 
+            {
+                msg.pose.covariance[i * cov.rows() + j] = cov(i, j);
+            }
+        }
+        cov = state.getVelocityCovariance();
+        for (int i = 0; i < cov.rows(); ++i) 
+        {
+            for (int j = 0; j < cov.cols(); ++j) 
+            {
+                msg.twist.covariance[i * cov.rows() + j] = cov(i, j);
+            }
+        }
     }
     else
     {

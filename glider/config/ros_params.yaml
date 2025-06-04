@@ -1,2 +1,4 @@
 rate: 100
 use_odom: true
+publish_nav_sat_fix: false
+utm_zone: "18S"
