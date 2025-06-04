@@ -11,7 +11,7 @@
 
 using namespace glider;
 
-Odometry::Odometry(gtsam::Values& vals, gtsam::Key key) 
+Odometry::Odometry(gtsam::Values& vals, gtsam::Key key, bool init)
 {
     pose_ = vals.at<gtsam::Pose3>(X(key));
     orientation_ = pose_.rotation();
@@ -20,8 +20,38 @@ Odometry::Odometry(gtsam::Values& vals, gtsam::Key key)
 
     altitude_ = pose_.translation().z();
     heading_ = pose_.rotation().yaw();
+    initialized_ = init;
 }
 
+Odometry::Odometry(gtsam::NavState& ns, bool init)
+{
+    position_ = ns.position();
+    orientation_ = ns.attitude();
+    pose_ = gtsam::Pose3(orientation_, position_);
+    velocity_ = ns.v();
+    altitude_ = position_.z();
+    heading_ = orientation_.yaw();
+    initialized_ = init;
+}
+
+Odometry Odometry::Uninitialized()
+{
+    Odometry odom;
+    odom.setInitializedStatus(false);
+
+    return odom;
+}
+
+bool Odometry::isInitialized() const
+{
+     return initialized_;
+}
+
+gtsam::NavState Odometry::getNavState() const
+{
+    gtsam::NavState ns(pose_, velocity_);
+    return ns;
+}
 
 template<typename T>
 T Odometry::getPose() const
@@ -186,3 +216,24 @@ double Odometry::getHeadingDegrees() const
 
     return heading_deg;
 }
+
+void Odometry::setInitializedStatus(bool init)
+{
+    initialized_ = init;
+}
+
+template gtsam::Pose3 Odometry::getPose<gtsam::Pose3>() const;
+template std::pair<Eigen::Vector3d, Eigen::Vector4d> Odometry::getPose<std::pair<Eigen::Vector3d, Eigen::Vector4d>>() const;
+template std::pair<Eigen::Vector3d, Eigen::Quaterniond> Odometry::getPose<std::pair<Eigen::Vector3d, Eigen::Quaterniond>>() const;
+
+template std::pair<Eigen::Vector3d, Eigen::Vector4d> Odometry::getEigenPose<Eigen::Vector3d, Eigen::Vector4d>() const;
+template std::pair<Eigen::Vector3d, Eigen::Quaterniond> Odometry::getEigenPose<Eigen::Vector3d, Eigen::Quaterniond>() const;
+
+template gtsam::Point3 Odometry::getPosition<gtsam::Point3>() const;
+
+template gtsam::Vector3 Odometry::getVelocity<gtsam::Vector3>() const;
+
+template gtsam::Rot3 Odometry::getOrientation<gtsam::Rot3>() const;
+template gtsam::Quaternion Odometry::getOrientation<gtsam::Quaternion>() const;
+template Eigen::Vector4d Odometry::getOrientation<Eigen::Vector4d>() const;
+template Eigen::Quaterniond Odometry::getOrientation<Eigen::Quaterniond>() const;

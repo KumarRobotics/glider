@@ -16,6 +16,8 @@
 #include "glider/core/factor_manager.hpp"
 #include "glider/utils/params.hpp"
 #include "glider/utils/quaternion.hpp"
+#include "glider/core/state.hpp"
+#include "glider/core/odometry.hpp"
 
 class FactorNode
 {

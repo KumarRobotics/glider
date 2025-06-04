@@ -12,6 +12,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/base/Matrix.h>
+#include <gtsam/navigation/NavState.h>
 #include <gtsam/navigation/ImuBias.h>
 
 #include <Eigen/Dense>
@@ -29,8 +30,9 @@ class Odometry
 {
     public:
         Odometry() = default;
-        Odometry(gtsam::Values& val, gtsam::Key key);
-        
+        Odometry(gtsam::Values& val, gtsam::Key key, bool init = true);
+        Odometry(gtsam::NavState& ns, bool init = true);
+
         template<typename T>
         T getPose() const;
         template<typename T>
@@ -40,13 +42,19 @@ class Odometry
         template<typename T>
         T getVelocity() const;
 
+        static Odometry Uninitialized();
+
+        gtsam::NavState getNavState() const;
         double getAltitude() const;
         double getHeading() const;
         double getHeadingDegrees() const;
+        bool isInitialized() const;
 
         double getLatitude(const char* zone);
         double getLongitude(const char* zone);
         std::pair<double, double> getLatLon(const char* zone);
+
+        void setInitializedStatus(bool init);
 
     protected:
         template<typename TF, typename TS>
@@ -62,5 +70,7 @@ class Odometry
 
         double altitude_;
         double heading_;
+
+        bool initialized_;
 };
 } // namespace glider

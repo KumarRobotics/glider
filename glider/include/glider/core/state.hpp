@@ -31,11 +31,10 @@ class State : public Odometry
 {
     public:
         State() = default;
-        State(bool initialized);
-        State(gtsam::Values& val, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized);
-        State(gtsam::Values& val, bool initialized);
+        State(gtsam::Values& val, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized = true);
+        State(gtsam::Values& val, bool initialized = true);
         
-        static State Zero();
+        static State Uninitialized();
 
         template<typename T>
         T getBias() const;
@@ -53,12 +52,10 @@ class State : public Odometry
         std::string getKeyIndex(const char* symbol);
 
         bool isMoving() const;
-        bool isInitialized() const;
 
     private:
 
         bool is_moving_;
-        bool is_initialized_;
         
         gtsam::Vector3 accelerometer_bias_;
         gtsam::Vector3 gyroscope_bias_;

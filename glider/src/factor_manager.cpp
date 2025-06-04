@@ -60,8 +60,8 @@ FactorManager::FactorManager(const std::map<std::string, double>& config, int64_
    
     this->smoother_ = gtsam::IncrementalFixedLagSmoother(this->config_["lag_time"], parameters_);
     this->isam_ = gtsam::ISAM2(this->parameters_);
-    this->current_optimized_pose_ = gtsam::Pose3();
-    this->last_velocity_ = gtsam::Point3(0, 0, 0);
+
+    this->current_state_ = State::Uninitialized();
 
     this->imu_buffer_ = ImuBuffer(1000);
     this->compose_odom_ = false;
@@ -103,7 +103,6 @@ void FactorManager::imuInitialize(const Eigen::Vector3d& accel_meas, const Eigen
         
         // GTSAM expects quaternion as w,x,y,z
         gtsam::Rot3 rot = gtsam::Rot3::Quaternion(orient(0), orient(1), orient(2), orient(3));
-        //rot = NED2ENU * rot;
         Eigen::Matrix3d init_orient_matrix = imu2body_ * rot.matrix();
         initial_orientation_ = gtsam::Rot3(init_orient_matrix);
         current_heading_ = initial_orientation_.yaw(); 
@@ -135,12 +134,11 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
     if (key_index_ == 0) 
     {
-        current_navstate_pose_ = gtsam::Pose3(initial_orientation_, gtsam::Point3(meas(0), meas(1), meas(2)));
+        gtsam::Pose3 current_navstate_pose = gtsam::Pose3(initial_orientation_, gtsam::Point3(meas(0), meas(1), meas(2)));
         
-        initial_navstate_ = gtsam::NavState(current_navstate_pose_, gtsam::Point3(0, 0, 0));
-        last_nav_state_ = initial_navstate_;
+        initial_navstate_ = gtsam::NavState(current_navstate_pose, gtsam::Point3(0, 0, 0));
         
-        initials_.insert(X(key_index_), current_navstate_pose_);
+        initials_.insert(X(key_index_), current_navstate_pose);
         initials_.insert(V(key_index_), gtsam::Point3(0, 0, 0));
         initials_.insert(B(key_index_), bias_);
 
@@ -148,7 +146,7 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         smoother_timestamps_[V(key_index_)] = timestamp_f;
         smoother_timestamps_[B(key_index_)] = timestamp_f;
 
-        graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(key_index_), current_navstate_pose_, gtsam::noiseModel::Isotropic::Sigma(6, 0.001)));
+        graph_.add(gtsam::PriorFactor<gtsam::Pose3>(X(key_index_), current_navstate_pose, gtsam::noiseModel::Isotropic::Sigma(6, 0.001)));
         graph_.add(gtsam::PriorFactor<gtsam::Point3>(V(key_index_), gtsam::Point3(0, 0, 0), gtsam::noiseModel::Isotropic::Sigma(3, 0.001)));
         graph_.add(gtsam::PriorFactor<gtsam::imuBias::ConstantBias>(B(key_index_), bias_, gtsam::noiseModel::Isotropic::Sigma(6, 0.001)));
         key_index_++;
@@ -169,8 +167,10 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
                                             *pim_copy_));
         pim_copy_->resetIntegration();
     
-        initials_.insert(X(key_index_), current_optimized_pose_);
-        initials_.insert(V(key_index_), current_velocity_);
+        //initials_.insert(X(key_index_), current_optimized_pose_);
+        initials_.insert(X(key_index_), current_state_.getPose<gtsam::Pose3>());
+        //initials_.insert(V(key_index_), current_velocity_);
+        initials_.insert(V(key_index_), current_state_.getVelocity<gtsam::Vector3>());
         initials_.insert(B(key_index_), bias_);
 
         smoother_timestamps_[X(key_index_)] = timestamp_f;
@@ -277,29 +277,22 @@ void FactorManager::addImuFactor(int64_t timestamp, const Eigen::Vector3d& accel
     
     pim_copy_->integrateMeasurement(accel_meas, gyro_meas, dt);
     last_imu_time_ = nanosecInt2Float(timestamp);
-    last_accel_meas_ = accel;
-    last_gyro_meas_ = gyro;
-    last_imu_orientation_ = orient;
 
     return;
 }
 
-std::tuple<Eigen::Vector3d, Eigen::Vector4d> FactorManager::predict(int64_t timestamp)
+Odometry FactorManager::predict(int64_t timestamp)
 {
-    if (!pim_)
+    if (!pim_ || !current_state_.isInitialized())
     {
-        return std::make_tuple(Eigen::Vector3d(0.0, 0.0, 0.0), Eigen::Vector4d(0.0, 0.0, 0.0, 0.0));
+        return Odometry::Uninitialized();
     }
-    gtsam::NavState navstate(current_optimized_pose_, last_velocity_);
-    gtsam::NavState result = pim_copy_->predict(navstate, bias_);
+    //gtsam::NavState navstate(current_optimized_pose_, last_velocity_);
+    gtsam::NavState result = pim_copy_->predict(current_state_.getNavState(), bias_);
 
-    gtsam::Rot3 rotation = result.attitude();
-    gtsam::Point3 translation = result.position();
-    gtsam::Quaternion quat = rotation.toQuaternion();
-    Eigen::Vector4d quaternion;
-    quaternion << quat.w(), quat.x(), quat.y(), quat.z();
+    Odometry ret(result);
 
-    return std::make_tuple(Eigen::Vector3d(translation.x(), translation.y(), translation.z()), quaternion);
+    return ret; 
 }
 
 void FactorManager::initializeGraph() 
@@ -408,7 +401,7 @@ State FactorManager::runner()
 {
     if (!initialized_) 
     {
-        State::Zero();
+        State::Uninitialized();
     }
     if (key_index_ > 1)
     {
@@ -422,46 +415,20 @@ State FactorManager::runner()
 
         pim_->resetIntegration();
         pim_copy_->resetIntegration();
-
-        gtsam::Pose3 optimized_pose = result.at<gtsam::Pose3>(X(key_index_-1));
-        this->current_optimized_pose_ = optimized_pose;
-        this->current_velocity_ = result.at<gtsam::Point3>(V(key_index_-1));    
-        
+ 
         if (start_odom_ == 1)
         {
             std::cout << "[GLIDER] Starting to fuse differential GPS" << std::endl;
             std::cout << "[GLIDER] Starting to fuse odometry" << std::endl;
-            initial_pose_for_odom_ = optimized_pose;
+            initial_pose_for_odom_ = current_state_.getPose<gtsam::Pose3>();
             start_odom_ = 2;
         }
-
-        if (key_index_ > 1)
-        {
-            this->last_optimized_pose_ = result.at<gtsam::Pose3>(X(key_index_-2));
-            this->last_velocity_ = result.at<gtsam::Point3>(V(key_index_-2));
-        }
-        else
-        {
-            this->last_optimized_pose_ = gtsam::Pose3();
-            this->last_velocity_ = gtsam::Point3(0.0, 0.0, 0.0);
-        }
-
-        gtsam::Rot3 rotation = optimized_pose.rotation();
-        gtsam::Point3 translation = optimized_pose.translation();
-
-        gtsam::Quaternion quat = rotation.toQuaternion();
-        Eigen::Vector4d quaternion;
-        quaternion << quat.w(), quat.x(), quat.y(), quat.z();
-        
-        orientation_ = quaternion;
-        translation_ = translation;
-        current_heading_ = rotation.yaw();
 
         return current_state_;
     }
     else
     {
-        return State::Zero();
+        return State::Uninitialized();
     }
 }
 
@@ -470,24 +437,8 @@ gtsam::ExpressionFactorGraph FactorManager::getGraph()
     return graph_;
 }
 
-template <typename T>
-T FactorManager::getKeyIndex()
-{
-    if (typeid(T) == typeid(int))
-    {
-        int index_as_int = static_cast<int>(gtsam::symbolIndex(key_index_));
-        return index_as_int;
-    }
-    else
-    {
-        return key_index_;
-    }
-}
-
 bool FactorManager::isInitialized()
 {
     return initialized_;
 }
 
-template int FactorManager::getKeyIndex<int>();
-template gtsam::Key FactorManager::getKeyIndex<gtsam::Key>();

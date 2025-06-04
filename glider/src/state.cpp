@@ -11,7 +11,7 @@
 
 using namespace glider;
 
-State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized) : Odometry(vals, key)
+State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool init) : Odometry(vals, key, init)
 {
     gtsam::imuBias::ConstantBias bias = vals.at<gtsam::imuBias::ConstantBias>(B(key));
 
@@ -26,19 +26,13 @@ State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam
 
     is_moving_ = (velocity_.norm() > 0.01) ? true : false;
 
-    is_initialized_ = initialized;
+    initialized_ = init;
 }
 
-State::State(bool initialized)
+State State::Uninitialized()
 {
-    // DONE
-    this->is_initialized_ = initialized;
-}
-
-State State::Zero()
-{
-    // DONE
     State state;
+    state.setInitializedStatus(false);
 
     return state;
 }
@@ -158,8 +152,12 @@ bool State::isMoving() const
     return is_moving_;
 }
 
-bool State::isInitialized() const
-{
-    return is_initialized_;
-}
 
+template gtsam::imuBias::ConstantBias State::getBias<gtsam::imuBias::ConstantBias>() const;
+template std::pair<Eigen::Vector3d, Eigen::Vector3d> State::getBias<std::pair<Eigen::Vector3d,Eigen::Vector3d>>() const;
+
+template gtsam::Vector3 State::getAccelerometerBias<gtsam::Vector3>() const;
+template gtsam::Vector3 State::getGyroscopeBias<gtsam::Vector3>() const;
+
+template gtsam::Key State::getKeyIndex<gtsam::Key>() const;
+template int State::getKeyIndex<int>() const;
