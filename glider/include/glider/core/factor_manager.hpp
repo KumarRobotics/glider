@@ -22,10 +22,10 @@
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/navigation/NavState.h>
 #include <gtsam/slam/InitializePose3.h>
-#include <gtsam/slam/RangeFactor.h>
 
 #include "imu_buffer.hpp"
 #include "state.hpp"
+#include "odometry.hpp"
 
 #include <Eigen/Dense>
 #include <iostream>
@@ -62,7 +62,7 @@ class FactorManager
         void initializeGraph();
         void imuInitialize(const Eigen::Vector3d& accel_meas, const Eigen::Vector3d& gyro_meas, const Eigen::Vector4d& orient);
 
-        std::tuple<Eigen::Vector3d, Eigen::Vector4d> predict(int64_t timestamp); 
+        Odometry predict(int64_t timestamp); 
 
         void addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps);
         void addOdometryFactor(int64_t timestamp, const Eigen::Vector3d& pose, const Eigen::Vector4d& quat);
@@ -75,9 +75,6 @@ class FactorManager
         gtsam::ExpressionFactorGraph getGraph();
         bool isInitialized();
 
-        template <typename T>
-        T getKeyIndex();
-
     private:
         // parameters
         std::map<std::string, double> config_;
@@ -89,6 +86,7 @@ class FactorManager
         Eigen::Vector3d gravity_vec_;
         Eigen::MatrixXd bias_estimate_vec_;
         Eigen::Matrix3d imu2body_;
+        gtsam::Matrix3 NED2ENU;
         
         int init_counter_;
         
@@ -114,24 +112,15 @@ class FactorManager
 
         // previous state
         Eigen::Vector3d last_gps_;
-        gtsam::Point3 last_velocity_;
         gtsam::Matrix last_marginal_covariance_;
-        gtsam::NavState last_nav_state_; 
-        Eigen::Vector3d last_accel_meas_;
-        Eigen::Vector3d last_gyro_meas_;
-        Eigen::Vector4d last_imu_orientation_;
-        gtsam::Pose3 last_optimized_pose_;
         gtsam::Pose3 last_odom_;
         double last_optimize_time_;
         double last_imu_time_;
         double last_gps_time_;
+        State last_state_;
 
         // current state
-        Eigen::Vector4d orientation_;
-        Eigen::Vector3d translation_;
-        gtsam::Pose3 current_optimized_pose_;
-        gtsam::Pose3 current_navstate_pose_;
-        gtsam::Point3 current_velocity_;
+        State current_state_;
         double current_heading_;
 
         // initialization
@@ -142,10 +131,5 @@ class FactorManager
         gtsam::Rot3 initial_orientation_;
         gtsam::Pose3 initial_pose_for_odom_;
         gtsam::NavState initial_navstate_;
-
-        State current_state_;
-        State last_state_;
-
-        gtsam::Matrix3 NED2ENU;
 };
 }

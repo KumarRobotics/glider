@@ -58,8 +58,6 @@ TEST(FactorTestSuite, GPSFactor)
 
     EXPECT_EQ(manager.getGraph().size(), initial_factor_count);
 
-    std::cout << "key index: " << manager.getKeyIndex<int>() << std::endl;
-    EXPECT_EQ(manager.getKeyIndex<int>(), 0);
 }
 
 

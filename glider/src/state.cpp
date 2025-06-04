@@ -6,132 +6,158 @@
 */
 
 #include "glider/core/state.hpp"
+#include "glider/core/odometry.hpp"
 #include "glider/utils/geodetics.hpp"
 
 using namespace glider;
 
-State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized)
+State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool init) : Odometry(vals, key, init)
 {
-    gtsam::Pose3 pose = vals.at<gtsam::Pose3>(X(key));
-    gtsam::Quaternion quat = pose.rotation().toQuaternion();
-    gtsam::Point3 vel = vals.at<gtsam::Point3>(V(key));
     gtsam::imuBias::ConstantBias bias = vals.at<gtsam::imuBias::ConstantBias>(B(key));
 
-    this->key_index = key;
+    key_index_ = key;
 
-    this->position = Eigen::Vector3d(pose.translation().x(), pose.translation().y(), pose.translation().z());
-    this->orientation = Eigen::Vector4d(quat.w(), quat.x(), quat.y(), quat.z());
-    this->velocity = Eigen::Vector3d(vel.x(), vel.y(), vel.z());
-    this->accelerometer_bias = bias.accelerometer();
-    this->gyroscope_bias = bias.gyroscope();
+    accelerometer_bias_ = bias.accelerometer();
+    gyroscope_bias_ = bias.gyroscope();
 
-    this->pose_covariance = pose_cov;
-    this->velocity_covariance = velocity_cov;
-    this->position_covariance = pose_cov.block<3,3>(0,0);
+    pose_covariance_ = pose_cov;
+    velocity_covariance_ = velocity_cov;
+    position_covariance_ = pose_cov.block<3,3>(0,0);
 
-    this->altitude = pose.translation().z();
-    this->heading = pose.rotation().yaw();
+    is_moving_ = (velocity_.norm() > 0.01) ? true : false;
 
-    if (velocity.norm() > 0.01) this->is_moving = true;
-    this->is_initialized = initialized;
+    initialized_ = init;
 }
 
-State::State(gtsam::Values& vals, bool initialized)
-{
-    // TODO
-}
-
-State State::Zero()
+State State::Uninitialized()
 {
     State state;
-    state.key_index = 0;
-
-    state.position = Eigen::Vector3d::Zero();
-    state.orientation = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
-    state.velocity = Eigen::Vector3d::Zero(3);
-
-    state.accelerometer_bias = Eigen::Vector3d::Zero();
-    state.gyroscope_bias = Eigen::Vector3d::Zero();
-
-    state.pose_covariance = Eigen::MatrixXd::Zero(6,6);
-    state.position_covariance = Eigen::MatrixXd::Zero(3,3);
-    state.velocity_covariance = Eigen::MatrixXd::Zero(3,3);
-
-    state.altitude = 0.0;
-    state.heading = 0.0;
-
-    state.setMovingStatus(false);
     state.setInitializedStatus(false);
-
-    state.setLatitude(0.0);
-    state.setLongitude(0.0);
 
     return state;
 }
 
-double State::getLatitude(const char* zone)
+Eigen::MatrixXd State::getPoseCovariance() const
 {
-    double temp;
-    geodetics::UTMtoLL(this->position(1), this->position(0), zone, this->latitude, temp);
-
-    return latitude;
+    return pose_covariance_;
 }
 
-double State::getLongitude(const char* zone)
+Eigen::MatrixXd State::getPositionCovariance() const
 {
-    double temp;
-    geodetics::UTMtoLL(this->position(1), this->position(0), zone, temp, this->longitude);
-
-    return latitude;
+    return position_covariance_;
 }
 
-std::pair<double, double> State::getLatLon(const char* zone)
+Eigen::MatrixXd State::getVelocityCovariance() const
 {
-    geodetics::UTMtoLL(this->position(1), this->position(0), zone, this->latitude, this->longitude);
-    return std::make_pair(latitude, longitude);
+    return velocity_covariance_;
 }
+
+template<typename T>
+T State::getBias() const
+{
+    if constexpr (std::is_same_v<T, gtsam::imuBias::ConstantBias>)
+    {
+        return gtsam::imuBias::ConstantBias(accelerometer_bias_, gyroscope_bias_);
+    }
+    else if constexpr (std::is_same_v<T, std::pair<Eigen::Vector3d, Eigen::Vector3d>>)
+    {
+        Eigen::Vector3d ab = accelerometer_bias_;
+        Eigen::Vector3d gb = gyroscope_bias_;
+        
+        return std::make_pair(ab, gb);
+    }
+    else
+    {
+        static_assert(std::is_same_v<T, gtsam::imuBias::ConstantBias> ||
+                      std::is_same_v<T, std::pair<Eigen::Vector3d, Eigen::Vector3d>>, "unsupported type");
+    }
+}
+
+// make the typing explicit on the gtsam::Vector3
+template<typename T>
+T State::getAccelerometerBias() const
+{
+    if constexpr (std::is_same_v<T, gtsam::Vector3>)
+    {
+        return accelerometer_bias_;
+    }   
+    else if constexpr (std::is_same_v<T, Eigen::Vector3d>)
+    {  
+        Eigen::Vector3d bias = accelerometer_bias_;
+        return bias;
+    }
+    else
+    {
+        static_assert(std::is_same_v<T, gtsam::Vector3> ||
+                      std::is_same_v<T, Eigen::Vector3d>, "unsupported type");
+    }
+}
+
+template<typename T>
+T State::getGyroscopeBias() const
+{
+    if constexpr (std::is_same_v<T, gtsam::Vector3>)
+    {
+        return gyroscope_bias_;
+    }
+    else if constexpr (std::is_same_v<T, Eigen::Vector3d>)
+    {
+        Eigen::Vector3d bias = gyroscope_bias_; 
+        return bias;
+    }
+    else
+    {
+        static_assert(std::is_same_v<T, gtsam::Vector3> ||
+                      std::is_same_v<T, Eigen::Vector3d>, "unsupported type");
+    }
+}
+
+template<typename T>
+T State::getKeyIndex() const
+{
+    if constexpr (std::is_same_v<T, gtsam::Key>)
+    {
+        return key_index_;
+    }
+    if constexpr (std::is_same_v<T, int>)
+    {
+        int i = static_cast<int>(gtsam::symbolIndex(key_index_));
+        return i;
+    }
+}
+
+std::string State::getKeyIndex(const char* symbol)
+{
+    if (std::strcmp(symbol,"x") || std::strcmp(symbol,"X"))
+    {
+        return gtsam::DefaultKeyFormatter(X(key_index_));
+    }
+    else if (std::strcmp(symbol,"b") || std::strcmp(symbol,"B"))
+    {
+        return gtsam::DefaultKeyFormatter(B(key_index_));
+    }
+    else if (std::strcmp(symbol,"v") || std::strcmp(symbol,"V"))
+    {
+        return gtsam::DefaultKeyFormatter(V(key_index_));
+    }
+    else
+    {
+        throw std::invalid_argument("unsupported symbol, use: X, B or V");
+    }
+}
+
 
 bool State::isMoving() const
 {
-    return is_moving;
+    return is_moving_;
 }
 
-bool State::isInitialized() const
-{
-    return is_initialized;
-}
 
-void State::setLatitude(const double lat)
-{
-    this->latitude = lat;
-}
+template gtsam::imuBias::ConstantBias State::getBias<gtsam::imuBias::ConstantBias>() const;
+template std::pair<Eigen::Vector3d, Eigen::Vector3d> State::getBias<std::pair<Eigen::Vector3d,Eigen::Vector3d>>() const;
 
-void State::setLongitude(const double lon)
-{
-    this->longitude = lon;
-}
+template gtsam::Vector3 State::getAccelerometerBias<gtsam::Vector3>() const;
+template gtsam::Vector3 State::getGyroscopeBias<gtsam::Vector3>() const;
 
-void State::setMovingStatus(const bool status)
-{
-    this->is_moving = status;
-}
-
-void State::setInitializedStatus(const bool status)
-{
-     this->is_initialized = status;
-}
-
-double State::getHeadingDegrees() const
-{
-    double heading_deg = (heading * 180.0) / M_PI;
-    if (heading_deg < 0.0) 
-    {
-        heading_deg += 360.0;
-    }
-    else if (heading_deg > 360.0)
-    {
-        heading_deg -= 360.0;
-    }
-
-    return heading_deg;
-}
+template gtsam::Key State::getKeyIndex<gtsam::Key>() const;
+template int State::getKeyIndex<int>() const;

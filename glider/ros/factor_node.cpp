@@ -54,23 +54,12 @@ void FactorNode::interpolationCallback(const ros::TimerEvent& event)
     if (!initialized_) return;
     
     int64_t timestamp = getTime(ros::Time::now());
-    auto [position, orientation] = factor_manager_.predict(timestamp);
-
-    if (position.norm() > 0)
-    {
-        nav_msgs::Odometry odom_msg;
-        
-        odom_msg.pose.pose.position.x = position(0);
-        odom_msg.pose.pose.position.y = position(1);
-        odom_msg.pose.pose.position.z = position(2);
-
-        odom_msg.pose.pose.orientation.w = orientation(0);
-        odom_msg.pose.pose.orientation.x = orientation(1);
-        odom_msg.pose.pose.orientation.y = orientation(2);
-        odom_msg.pose.pose.orientation.z = orientation(3);
-
-        odom_pub_.publish(odom_msg);
-    }
+    glider::Odometry odom = factor_manager_.predict(timestamp);
+    
+    if (!odom.isInitialized()) return;
+    
+    nav_msgs::Odometry odom_msg = rosutil::toRosMsg<nav_msgs::Odometry>(odom);
+    odom_pub_.publish(odom_msg);
 }
 
 void FactorNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
@@ -123,13 +112,9 @@ void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     {
         timestamp = getTime(msg->header.stamp);
     }
-    //std::cout << "GPS timestamp " << timestamp << std::endl;
     factor_manager_.addGpsFactor(timestamp, gps_factor);
-    //std::cout << "optimizing with time " << timestamp << std::endl;
     
     glider::State state = factor_manager_.runner();
-    //auto [position, quaternion, rotation] = factor_manager_.runner();
-    //std::cout << "[GLIDER] Heading: " << state.getHeadingDegrees() << std::endl;    
     if (!initialized_) initialized_ = true;
 }
 
@@ -145,10 +130,6 @@ void FactorNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
                           msg->linear_acceleration.y,
                           msg->linear_acceleration.z);
     
-    //glider::Quaternion quat(msg->orientation.w,
-    //                        msg->orientation.x,
-    //                        msg->orientation.y,
-    //                        msg->orientation.z);
     Eigen::Quaterniond quat(msg->orientation.w,
                             msg->orientation.x,
                             msg->orientation.y,
@@ -167,7 +148,6 @@ void FactorNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
     {
         timestamp = getTime(msg->header.stamp);
     }
-    //std::cout << "IMU timestamp " << timestamp << std::endl;
     Eigen::Vector4d q_vec(quat.w(), quat.x(), quat.y(), quat.z());
     factor_manager_.addImuFactor(timestamp, accel, gyro, q_vec);
 }
