@@ -23,7 +23,11 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
     
     nh_.getParam("/use_sim_time", use_sim_time_);
     bool use_odom;
-    nh_.getParam("/use_odom", use_odom);
+    nh_.getParam("/glider_node/use_odom", use_odom);
+
+    nh_.getParam("/glider_node/publish_nav_sat_fix", publish_nsf_);
+    nh_.getParam("/glider_node/utm_zone", utm_zone_);
+    current_state_ = glider::State::Uninitialized();
 
     std::map<std::string, double> config;
     config = params.load<double>(path);
@@ -37,7 +41,16 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
         odom_sub_ = nh_.subscribe("/odom", 1, &FactorNode::odomCallback, this);
     }
 
-    odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/glider/odom", 10);
+    if (publish_nsf_)
+    {
+        ROS_INFO("[GLIDER] Publishing NavSatFix msg on /glider/odom");
+        odom_pub_ = nh_.advertise<sensor_msgs::NavSatFix>("/glider/odom", 10);
+    }
+    else
+    {
+        ROS_INFO("[GLIDER] Publishing Odometry msg on /glider/odom");
+        odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/glider/odom", 10);
+    }
 
     ros::Duration d = rosutil::hzToDuration(freq);
     timer_ = nh_.createTimer(d, &FactorNode::interpolationCallback, this);
@@ -51,15 +64,24 @@ int64_t FactorNode::getTime(const ros::Time& stamp) const
 
 void FactorNode::interpolationCallback(const ros::TimerEvent& event)
 {
-    if (!initialized_) return;
+    if (!initialized_ || !current_state_.isInitialized()) return;
     
     int64_t timestamp = getTime(ros::Time::now());
     glider::Odometry odom = factor_manager_.predict(timestamp);
     
     if (!odom.isInitialized()) return;
-    
-    nav_msgs::Odometry odom_msg = rosutil::toRosMsg<nav_msgs::Odometry>(odom);
-    odom_pub_.publish(odom_msg);
+    if (publish_nsf_)
+    {
+        sensor_msgs::NavSatFix odom_msg = rosutil::toRosMsg<sensor_msgs::NavSatFix>(odom, utm_zone_.c_str());
+        rosutil::addCovariance<sensor_msgs::NavSatFix>(current_state_, odom_msg);
+        odom_pub_.publish(odom_msg);
+    }
+    else
+    {
+        nav_msgs::Odometry odom_msg = rosutil::toRosMsg<nav_msgs::Odometry>(odom);
+        rosutil::addCovariance<nav_msgs::Odometry>(current_state_, odom_msg);
+        odom_pub_.publish(odom_msg);
+    }
 }
 
 void FactorNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
@@ -105,7 +127,6 @@ void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     int64_t timestamp;
     if (use_sim_time_)
     {
-        std::cout << "using sim time" << std::endl;
         timestamp = getTime(ros::Time::now());
     }
     else
@@ -114,7 +135,7 @@ void FactorNode::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     }
     factor_manager_.addGpsFactor(timestamp, gps_factor);
     
-    glider::State state = factor_manager_.runner();
+    current_state_ = factor_manager_.runner();
     if (!initialized_) initialized_ = true;
 }
 

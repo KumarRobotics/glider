@@ -46,10 +46,13 @@ class FactorNode
 
         bool initialized_;
         bool use_sim_time_;
+        bool publish_nsf_;
+        std::string utm_zone_;
         Params params;
 
         glider::Quaternion prev_quat_;
         Eigen::Vector3d prev_position_;
 
         Eigen::Matrix3d ned_to_enu_;
+        glider::State current_state_;
 };
