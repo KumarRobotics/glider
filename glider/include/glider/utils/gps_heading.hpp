@@ -27,19 +27,11 @@ double gpsHeading(double lat1, double lon1, double lat2, double lon2)
     return heading_rad;
 }
 
-double headingRadiansToDegrees(double heading, bool use_enu = true)
+double headingRadiansToDegrees(double heading)
 {
     double heading_deg = heading * (180.0 / M_PI);
     
-    if (heading_deg < 0.0)
-    {
-        heading_deg = heading_deg + 360.0;
-    }
-    else if (heading_deg > 360.0)
-    {
-        heading_deg = heading_deg - 360.0;
-    }
-
+    heading_deg = std::fmod(std::fmod(heading_deg, 360.0) + 360.0, 360.0);
     return heading_deg;
 }
 
