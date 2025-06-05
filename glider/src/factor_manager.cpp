@@ -22,7 +22,7 @@ double nanosecInt2Float(int64_t timestamp)
     return timestamp * 1e-9;
 }
 
-FactorManager::FactorManager(const std::map<std::string, double>& config, int64_t start_time)
+FactorManager::FactorManager(const std::map<std::string, double>& config)
 {   
     this->config_ = config;
     for (const auto& kv : config) 
@@ -167,15 +167,13 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
                                             *pim_copy_));
         pim_copy_->resetIntegration();
     
-        //initials_.insert(X(key_index_), current_optimized_pose_);
         initials_.insert(X(key_index_), current_state_.getPose<gtsam::Pose3>());
-        //initials_.insert(V(key_index_), current_velocity_);
         initials_.insert(V(key_index_), current_state_.getVelocity<gtsam::Vector3>());
         initials_.insert(B(key_index_), bias_);
 
         smoother_timestamps_[X(key_index_)] = timestamp_f;
         smoother_timestamps_[V(key_index_)] = timestamp_f;
-        smoother_timestamps_[R(key_index_)] = timestamp_f;
+        smoother_timestamps_[B(key_index_)] = timestamp_f;
 
     }
 
@@ -184,7 +182,7 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         if (current_state_.isMoving())
         {
             // add differential gps heading in ENU frame
-            std::cout << "Adding differential gps" << std::endl;
+            //std::cout << "Adding differential gps" << std::endl;
 
             double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
             double enu_heading = geodetics::geodeticToENU(heading);
@@ -209,7 +207,7 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
     if (start_odom_ == 2)
     {
-        std::cout << "Adding between factor from odometry" << std::endl;
+        //std::cout << "Adding between factor from odometry" << std::endl;
         // Add a between factor from composed odom
         graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(X(key_index_-1), X(key_index_), last_odom_, odom_noise_));
         compose_odom_ = false;
@@ -287,7 +285,6 @@ Odometry FactorManager::predict(int64_t timestamp)
     {
         return Odometry::Uninitialized();
     }
-    //gtsam::NavState navstate(current_optimized_pose_, last_velocity_);
     gtsam::NavState result = pim_copy_->predict(current_state_.getNavState(), bias_);
 
     Odometry ret(result);
@@ -310,58 +307,7 @@ gtsam::Values FactorManager::optimize()
     {
         return gtsam::Values();
     }
-    
-    //last_marginal_covariance = _isam.marginalCovariance(X(_key_index-1));
-    
-    //std::cout << "=== DEBUGGING SMOOTHER KEYS ===" << std::endl;
-    //
-    //// Debug initial values
-    //std::cout << "Keys in _initials: ";
-    //for (const auto& key_value : initials_) {
-    //    std::cout << gtsam::DefaultKeyFormatter(key_value.key) << " ";
-    //}
-    //std::cout << std::endl;
-    //
-    //// Debug timestamps
-    //std::cout << "Keys with timestamps: ";
-    //for (const auto& kv : smoother_timestamps_) {
-    //    std::cout << gtsam::DefaultKeyFormatter(kv.first) << " ";
-    //}
-    //std::cout << std::endl;
-    //
-    //// Debug factor keys
-    //std::cout << "Keys referenced in factors: ";
-    //std::set<gtsam::Key> factor_keys;
-    //for (const auto& factor : graph_) {
-    //    for (gtsam::Key key : factor->keys()) {
-    //        factor_keys.insert(key);
-    //        std::cout << gtsam::DefaultKeyFormatter(key) << " ";
-    //    }
-    //}
-    //std::cout << std::endl;
-    //
-    //// Check for missing keys
-    //std::cout << "Missing keys (in factors but not in initials): ";
-    //for (gtsam::Key key : factor_keys) {
-    //    if (!initials_.exists(key)) {
-    //        std::cout << gtsam::DefaultKeyFormatter(key) << " ";
-    //    }
-    //}
-    //std::cout << std::endl;
-    //
-    //// Check for missing timestamps
-    //std::cout << "Missing timestamps (in factors but no timestamp): ";
-    //for (gtsam::Key key : factor_keys) {
-    //    if (smoother_timestamps_.find(key) == smoother_timestamps_.end()) {
-    //        std::cout << gtsam::DefaultKeyFormatter(key) << " ";
-    //    }
-    //}
-    //std::cout << std::endl;
-
-    //graph_.print();
-    //std::cout << "graph size: " << graph_.size() << " initials size: " << initials_.size() << std::endl;
-    //// end debug output
-    
+     
     if (graph_.size() == 0 || initials_.size() == 0)
     {
         std::cout << "[GLIDER] No factors or initials, skipping optimization" << std::endl;
@@ -376,23 +322,19 @@ gtsam::Values FactorManager::optimize()
         }
         catch (const std::exception& e)
         {
-            std::cout << "[GLIDER] No current estimate" << std::endl;
+            std::cerr << "[GLIDER] No current estimate" << std::endl;
             return gtsam::Values();
         }
     }
     gtsam::Values result;
     if (key_index_ > 1)
     {
-        isam_.update(graph_, initials_);
-        result = isam_.calculateEstimate();
+        //isam_.update(graph_, initials_);
+        //result = isam_.calculateEstimate();
         
-        //smoother_.update(graph_, initials_, smoother_timestamps_);
-        //gtsam::Values result = smoother_.calculateEstimate();
-        //last_marginal_covariance_ = smoother_.marginalCovariance(X(key_index_-1));
+        smoother_.update(graph_, initials_, smoother_timestamps_);
+        result = smoother_.calculateEstimate();
 
-        initials_.clear();
-        smoother_timestamps_.clear();
-        graph_.resize(0);
     }
     return result;
 }
@@ -406,13 +348,13 @@ State FactorManager::runner()
     if (key_index_ > 1)
     {
         gtsam::Values result = optimize();
-        
         last_state_ = current_state_;
         
-        gtsam::Matrix pose_cov = isam_.marginalCovariance(X(key_index_-1));
-        gtsam::Matrix vel_cov = isam_.marginalCovariance(V(key_index_-1));
-        current_state_ = State(result, key_index_-1, pose_cov, vel_cov, true);
+        gtsam::Matrix pose_cov = smoother_.marginalCovariance(X(key_index_-1));
+        gtsam::Matrix vel_cov = smoother_.marginalCovariance(V(key_index_-1));
 
+        current_state_ = State(result, key_index_-1, pose_cov, vel_cov, true);
+        
         pim_->resetIntegration();
         pim_copy_->resetIntegration();
  
@@ -423,6 +365,10 @@ State FactorManager::runner()
             initial_pose_for_odom_ = current_state_.getPose<gtsam::Pose3>();
             start_odom_ = 2;
         }
+        
+        initials_.clear();
+        smoother_timestamps_.clear();
+        graph_.resize(0);
 
         return current_state_;
     }

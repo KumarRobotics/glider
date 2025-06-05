@@ -17,7 +17,7 @@ TEST(FactorTestSuite, ImuInitialization)
     std::map<std::string, double> config;
     config = params.load<double>("/home/jason/ws/src/glider/config/graph_params.yaml");
 
-    glider::FactorManager manager(config, 0);
+    glider::FactorManager manager(config);
 
     Eigen::Vector3d accel(0.0, 0.0, 0.0);
     Eigen::Vector3d gyro(0.0, 0.0, 0.0);
@@ -40,7 +40,7 @@ TEST(FactorTestSuite, GPSFactor)
 {
     // Test setup
     std::map<std::string, double> config;
-    glider::FactorManager manager(config,0);
+    glider::FactorManager manager(config);
 
     int64_t time = 0;
     Eigen::Vector3d gps(39.941570, -75.199093, 0.0);

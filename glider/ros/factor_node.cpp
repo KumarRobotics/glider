@@ -15,7 +15,7 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
                  0.0, 0.0, -1.0).finished();
 
     nh_.getParam("/glider_node/rate", freq);
-    ROS_DEBUG_STREAM("Useing prediction rate: "<< freq);
+    ROS_INFO_STREAM("Useing prediction rate: "<< freq);
     
     std::string path;
     nh_.getParam("/glider_node/path", path);
@@ -31,8 +31,7 @@ FactorNode::FactorNode(ros::NodeHandle& nh) : nh_(nh)
 
     std::map<std::string, double> config;
     config = params.load<double>(path);
-    int64_t time_now = this->getTime(ros::Time::now());
-    factor_manager_ = glider::FactorManager(config, time_now);
+    factor_manager_ = glider::FactorManager(config);
 
     gps_sub_ = nh_.subscribe("/gps", 1, &FactorNode::gpsCallback, this);
     imu_sub_ = nh_.subscribe("/imu", 10, &FactorNode::imuCallback, this);

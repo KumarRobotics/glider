@@ -55,7 +55,7 @@ class FactorManager
 {
     public:
         FactorManager() = default;
-        FactorManager(const std::map<std::string, double>& config, int64_t start_time);
+        FactorManager(const std::map<std::string, double>& config);
         
         static boost::shared_ptr<gtsam::PreintegrationCombinedParams> defaultParams(double g);
         
