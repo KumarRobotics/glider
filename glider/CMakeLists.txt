@@ -17,23 +17,18 @@ find_package(GTSAM REQUIRED)
 find_package(GTSAM_UNSTABLE REQUIRED)
 find_package(GTest REQUIRED)
 find_package(yaml-cpp REQUIRED)
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
-  sensor_msgs
-  nav_msgs
-)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES glider
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs nav_msgs
-)
+set(node_plugins "")
 
 # Include directories
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${GTSAM_INCLUDE_DIR}
   ${yaml-cpp_INCLUDE_DIRS}
@@ -56,17 +51,35 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     gtsam_unstable
     yaml-cpp
     tbb
-    ${catkin_LIBRARIES}
+    rclcpp::rclcpp
+    rclcpp_components::component
+    ${sensor_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
 )
 
 # executables
-add_executable(glider_ros
-  ros/node.cpp
+#add_executable(glider_ros
+#  ros/node.cpp
+#)
+#
+#target_link_libraries(glider_ros
+#  ${PROJECT_NAME}
+#)
+
+ament_export_include_directories(include)
+ament_export_dependencies(
+  rclcpp
+  rclcpp_components
+  sensor_msgs
+  geometry_msgs
+  nav_msgs
+  message_filters
+  tf2_eigen
+  Eigen3
 )
 
-target_link_libraries(glider_ros
-  ${PROJECT_NAME}
-)
+ament_package()
 
 # TESTS
 enable_testing()
