@@ -4,20 +4,29 @@
 */
 
 #include "glider/ros/factor_node.hpp"
+#include <rclcpp_components/register_node_macro.hpp>
+#include <rclcpp/rclcpp.hpp>
+
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "glider_node");
-    ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    rclcpp::NodeOptions options;
 
     try
     {
-        FactorNode node(nh);
-        ros::spin();
+        auto node = std::make_shared<glider::FactorNode>(options);
+        rclcpp::executors::MultiThreadedExecutor executor;
+
+        executor.add_node(node);
+
+        executor.spin();
+
+        rclcpp::shutdown();
     }
     catch (const std::exception& e)
     {
-        ROS_ERROR("%s: %s", nh.getNamespace().c_str(), e.what());
+        std::cerr << "[GLIDER] Caught error " << e.what() << std::endl;
     }
     return 0;
 }

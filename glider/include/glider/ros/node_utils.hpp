@@ -1,31 +1,32 @@
-
-#include <ros/ros.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <nav_msgs/Odometry.h>
-#include <std_msgs/Header.h>
+#include <chrono>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <std_msgs/msg/header.hpp>
 
 #include "glider/core/state.hpp"
 
 namespace rosutil
 {
 
-ros::Duration hzToDuration(double freq)
+std::chrono::milliseconds hzToDuration(double freq)
 {
     if (freq <= 0)
     {
-        ROS_WARN("Invalid frequency: %f Hz. Using 1 Hz instead", freq);
+        std::cerr << "Invalid frequency: "<< freq << " Hz. Using 1 Hz instead" << std::endl;
         freq = 1.0;
     }
 
     double period_seconds = 1.0 / freq;
-
-    return ros::Duration(period_seconds);
+    
+    std::chrono::milliseconds period_ms = std::chrono::milliseconds(static_cast<int64_t>(period_seconds * 1e3));
+    return period_ms;
 }
 
-std_msgs::Header getHeader(std::string frame_id)
+std_msgs::msg::Header getHeader(const std::string& frame_id)
 {
-    std_msgs::Header msg;
-    msg.stamp = ros::Time::now();
+    std_msgs::msg::Header msg;
+    //msg.stamp =;
     msg.frame_id = frame_id;
 
     return msg;
@@ -34,9 +35,9 @@ std_msgs::Header getHeader(std::string frame_id)
 template <typename T>
 T toRosMsg(glider::State& state, const char* zone = nullptr)
 {
-    if constexpr (std::is_same_v<T, sensor_msgs::NavSatFix>)
+    if constexpr (std::is_same_v<T, sensor_msgs::msg::NavSatFix>)
     {
-        sensor_msgs::NavSatFix msg;
+        sensor_msgs::msg::NavSatFix msg;
         if (zone == nullptr)
         {
             throw std::invalid_argument("specify a zone for UTM to GPS conversion");
@@ -61,9 +62,9 @@ T toRosMsg(glider::State& state, const char* zone = nullptr)
         }
         return msg;
     }
-    else if constexpr (std::is_same_v<T, nav_msgs::Odometry>)
+    else if constexpr (std::is_same_v<T, nav_msgs::msg::Odometry>)
     {
-        nav_msgs::Odometry msg;
+        nav_msgs::msg::Odometry msg;
 
         Eigen::Vector3d p = state.getPosition<Eigen::Vector3d>();
         msg.pose.pose.position.x = p(0);
@@ -104,17 +105,17 @@ T toRosMsg(glider::State& state, const char* zone = nullptr)
     }
     else
     {
-        static_assert(!std::is_same_v<T, sensor_msgs::NavSatFix> ||
-                      !std::is_same_v<T, nav_msgs::Odometry>, "unsupported ros msg, use Odometry or NavSatFix");
+        static_assert(!std::is_same_v<T, sensor_msgs::msg::NavSatFix> ||
+                      !std::is_same_v<T, nav_msgs::msg::Odometry>, "unsupported ros msg, use Odometry or NavSatFix");
     }
 }
 
 template <typename T>
 T toRosMsg(glider::Odometry& odom, const char* zone = nullptr)
 {
-    if constexpr (std::is_same_v<T, sensor_msgs::NavSatFix>)
+    if constexpr (std::is_same_v<T, sensor_msgs::msg::NavSatFix>)
     {
-        sensor_msgs::NavSatFix msg;
+        sensor_msgs::msg::NavSatFix msg;
         if (zone == nullptr)
         {
             throw std::invalid_argument("specify a zone for UTM to GPS converstion");
@@ -131,9 +132,9 @@ T toRosMsg(glider::Odometry& odom, const char* zone = nullptr)
         }
         return msg;
     }
-    else if constexpr (std::is_same_v<T, nav_msgs::Odometry>)
+    else if constexpr (std::is_same_v<T, nav_msgs::msg::Odometry>)
     { 
-        nav_msgs::Odometry msg;
+        nav_msgs::msg::Odometry msg;
 
         Eigen::Vector3d p = odom.getPosition<Eigen::Vector3d>();
         msg.pose.pose.position.x = p(0);
@@ -157,15 +158,15 @@ T toRosMsg(glider::Odometry& odom, const char* zone = nullptr)
     }
     else
     {
-        static_assert(!std::is_same_v<T, sensor_msgs::NavSatFix> ||
-                      !std::is_same_v<T, nav_msgs::Odometry>, "unsupported ros msg, use Odometry or NavSatFix");
+        static_assert(!std::is_same_v<T, sensor_msgs::msg::NavSatFix> ||
+                      !std::is_same_v<T, nav_msgs::msg::Odometry>, "unsupported ros msg, use Odometry or NavSatFix");
     }
 }
 
 template<typename T>
 void addCovariance(glider::State& state, T& msg)
 {
-    if constexpr (std::is_same_v<T, sensor_msgs::NavSatFix>)
+    if constexpr (std::is_same_v<T, sensor_msgs::msg::NavSatFix>)
     {
         Eigen::Matrix3d cov = state.getPositionCovariance();
         for (int i = 0; i < cov.rows(); ++i) 
@@ -176,7 +177,7 @@ void addCovariance(glider::State& state, T& msg)
             }
         }
     }
-    else if constexpr (std::is_same_v<T, nav_msgs::Odometry>)
+    else if constexpr (std::is_same_v<T, nav_msgs::msg::Odometry>)
     { 
         Eigen::MatrixXd cov = state.getPoseCovariance();
         for (int i = 0; i < cov.rows(); ++i) 
@@ -197,8 +198,8 @@ void addCovariance(glider::State& state, T& msg)
     }
     else
     {
-        static_assert(!std::is_same_v<T, sensor_msgs::NavSatFix> ||
-                      !std::is_same_v<T, nav_msgs::Odometry>, "unsupported ros msg, use Odometry or NavSatFix");
+        static_assert(!std::is_same_v<T, sensor_msgs::msg::NavSatFix> ||
+                      !std::is_same_v<T, nav_msgs::msg::Odometry>, "unsupported ros msg, use Odometry or NavSatFix");
     }
 }
 
