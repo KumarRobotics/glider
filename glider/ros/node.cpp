@@ -15,12 +15,12 @@ int main(int argc, char **argv)
 
     try
     {
-        rclcpp::Node = std::make_shared<glider::FactorNode> node(options);
+        auto node = std::make_shared<glider::FactorNode>(options);
         rclcpp::executors::MultiThreadedExecutor executor;
 
         executor.add_node(node);
 
-        executor.spin()
+        executor.spin();
 
         rclcpp::shutdown();
     }

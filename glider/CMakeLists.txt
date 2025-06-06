@@ -58,14 +58,42 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     ${std_msgs_TARGETS}
 )
 
+rclcpp_components_register_nodes(${PROJECT_NAME} "glider::FactorNode")
+set(node_plugins "${node_plugins}glider::FactorNode;$<TARGET_FILE:${PROJECT_NAME}>\n")
+
 # executables
-#add_executable(glider_ros
-#  ros/node.cpp
-#)
-#
-#target_link_libraries(glider_ros
-#  ${PROJECT_NAME}
-#)
+add_executable(glider_composition
+  ros/node.cpp
+)
+
+target_link_libraries(glider_composition
+  rclcpp::rclcpp
+  ${PROJECT_NAME}
+)
+
+# Install include directories
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+# Install launch files if you have any
+install(DIRECTORY
+  launch
+  config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(TARGETS
+  ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS 
+  glider_composition
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 ament_export_include_directories(include)
 ament_export_dependencies(
