@@ -1,6 +1,6 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetParameter
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -39,20 +39,18 @@ def generate_launch_description():
         'config',
         'graph_params.yaml'
     ])
-    
-    # Set global parameters
-    set_use_sim_time = SetParameter('use_sim_time', use_sim_time)
-    set_use_odom = SetParameter('use_odom', use_odom)
-    
+     
     # Create the glider node
     glider_node = Node(
         package='glider',
-        executable='glider_ros',
+        executable='glider_composition',
         name='glider_node',
         output='screen',
         parameters=[
             ros_params_file,
-            {'path': graph_params_file}
+            {'path': graph_params_file,
+             'use_sim_time': use_sim_time,
+             'use_odom': use_odom}
         ],
         remappings=[
             ('/gps', '/ublox/fix'),
@@ -61,10 +59,4 @@ def generate_launch_description():
         ]
     )
     
-    return LaunchDescription([
-        use_sim_time_arg,
-        use_odom_arg,
-        set_use_sim_time,
-        set_use_odom,
-        glider_node
-    ])
+    return LaunchDescription([use_sim_time_arg, use_odom_arg, glider_node])
