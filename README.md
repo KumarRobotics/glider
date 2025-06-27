@@ -25,5 +25,5 @@ ctest
 ```
 
 #### Authors
- - **Corresponding:** Jason Hughes jasonah.at.seas.upenn.edu
+ - **Corresponding:** [Jason Hughes](jasonah@.seas.upenn.edu)
  - Varun Murali

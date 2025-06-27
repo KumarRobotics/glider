@@ -17,23 +17,10 @@ find_package(GTSAM REQUIRED)
 find_package(GTSAM_UNSTABLE REQUIRED)
 find_package(GTest REQUIRED)
 find_package(yaml-cpp REQUIRED)
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
-  sensor_msgs
-  nav_msgs
-)
-
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES glider
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs nav_msgs
-)
 
 # Include directories
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${GTSAM_INCLUDE_DIR}
   ${yaml-cpp_INCLUDE_DIRS}
@@ -48,7 +35,6 @@ add_library(${PROJECT_NAME} SHARED
   src/quaternion.cpp
   src/odometry.cpp
   src/state.cpp
-  ros/factor_node.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
@@ -56,16 +42,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     gtsam_unstable
     yaml-cpp
     tbb
-    ${catkin_LIBRARIES}
-)
-
-# executables
-add_executable(glider_ros
-  ros/node.cpp
-)
-
-target_link_libraries(glider_ros
-  ${PROJECT_NAME}
 )
 
 # TESTS
