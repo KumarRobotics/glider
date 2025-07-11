@@ -66,6 +66,7 @@ FactorManager::FactorManager(const std::map<std::string, double>& config)
     this->imu_buffer_ = ImuBuffer(1000);
     this->compose_odom_ = false;
     this->start_odom_ = false;
+    this->use_differential_gps_ = static_cast<bool>(this->config_["use_differnential_gps"]);
 
     std::cout << "[GLIDER] Factor Manager Initialized" << std::endl;
 }
@@ -177,29 +178,31 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
 
     }
 
-    if (heading_count_ == 4)
-    {    
-        if (current_state_.isMoving())
-        {
-            // add differential gps heading in ENU frame
-            //std::cout << "Adding differential gps" << std::endl;
-
-            double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
-            double enu_heading = geodetics::geodeticToENU(heading);
-            gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(enu_heading);     
-            
-            graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
-            last_gps_ = gps;
-
-            // once we have a good heading from dgps, we can
-            // more accurately rotate the odom to enu frame
-            if (start_odom_ == 0) start_odom_ = 1;
-        }
-        heading_count_ = 0;
-    }
-    else
+    if (use_differential_gps_)
     {
-        heading_count_++;
+        if (heading_count_ == 4)
+        {    
+            if (current_state_.isMoving())
+            {
+                // add differential gps heading in ENU frame
+                //std::cout << "Adding differential gps" << std::endl;
+
+                double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
+                gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(heading);     
+                
+                graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
+                last_gps_ = gps;
+
+                // once we have a good heading from dgps, we can
+                // more accurately rotate the odom to enu frame
+                if (start_odom_ == 0) start_odom_ = 1;
+            }
+            heading_count_ = 0;
+        }
+        else
+        {
+            heading_count_++;
+        }
     }
     
     // Add gps factor in utm frame
@@ -360,7 +363,7 @@ State FactorManager::runner()
  
         if (start_odom_ == 1)
         {
-            std::cout << "[GLIDER] Starting to fuse differential GPS" << std::endl;
+            if (use_differential_gps_) std::cout << "[GLIDER] Starting to fuse differential GPS" << std::endl;
             std::cout << "[GLIDER] Starting to fuse odometry" << std::endl;
             initial_pose_for_odom_ = current_state_.getPose<gtsam::Pose3>();
             start_odom_ = 2;

@@ -13,3 +13,4 @@ double:
   bearing_noise: 0.09
   heading_noise: 0.09 #radians
   lag_time: 10.0
+  use_differential_gps: 0.0
