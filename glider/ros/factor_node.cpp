@@ -78,6 +78,9 @@ void FactorNode::interpolationCallback(const ros::TimerEvent& event)
     else
     {
         nav_msgs::Odometry odom_msg = rosutil::toRosMsg<nav_msgs::Odometry>(odom);
+        odom_msg.pose.pose.position.x = odom_msg.pose.pose.position.x - 482987.39455f;
+        odom_msg.pose.pose.position.y = odom_msg.pose.pose.position.y - 4421322.0397f;
+        odom_msg.header.frame_id = "map";
         rosutil::addCovariance<nav_msgs::Odometry>(current_state_, odom_msg);
         odom_pub_.publish(odom_msg);
     }

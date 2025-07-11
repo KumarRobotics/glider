@@ -185,8 +185,7 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
             //std::cout << "Adding differential gps" << std::endl;
 
             double heading = geodetics::gpsHeading(last_gps_(0), last_gps_(1), gps(0), gps(1));
-            double enu_heading = geodetics::geodeticToENU(heading);
-            gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(enu_heading);     
+            gtsam::Rot3 heading_rot = gtsam::Rot3::Yaw(heading);     
             
             graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), heading_rot, heading_noise_);
             last_gps_ = gps;
