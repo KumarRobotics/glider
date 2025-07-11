@@ -50,6 +50,13 @@ RUN sudo apt-get install -y python3-catkin-tools
 RUN sudo apt-get install -y python3-pip
 RUN pip3 install flask folium flask_socketio utm
 
+# add run dependencies
+RUN sudo apt-get install -y ros-noetic-pcl-ros libspdlog-dev libgoogle-glog-dev
+RUN cd ws/src \
+ && git clone https://github.com/KumarRobotics/imu_vn_100 \
+ && git clone --recurse-submodules https://github.com/ouster-lidar/ouster-ros.git \
+ && git clone https://github.com/gaoxiang12/faster-lio 
+
 # build ros env
 RUN cd ~/ws \
  && catkin config --extend /opt/ros/noetic \
