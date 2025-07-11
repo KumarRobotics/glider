@@ -3,3 +3,4 @@ tanqueray/build/
 visualizer/build/
 **/*.pyc
 visualizer/
+build/

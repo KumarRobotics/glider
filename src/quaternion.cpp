@@ -16,13 +16,6 @@ Quaternion::Quaternion(double w_in, double x_in, double y_in, double z_in)
     w = w_in;
 }
 
-Quaternion::Quaternion(geometry_msgs::Quaternion q)
-{
-    x = q.x;
-    y = q.y;
-    z = q.z;
-    w = q.w;
-}
 
 Quaternion Quaternion::inverse() const
 {

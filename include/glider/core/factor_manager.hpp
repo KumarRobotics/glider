@@ -131,5 +131,7 @@ class FactorManager
         gtsam::Rot3 initial_orientation_;
         gtsam::Pose3 initial_pose_for_odom_;
         gtsam::NavState initial_navstate_;
+
+        bool use_differential_gps_;
 };
 }
