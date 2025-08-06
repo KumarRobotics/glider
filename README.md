@@ -1,4 +1,4 @@
-## Glider
+## Glider (beta)
 
 Glider is a GPS-Odometry-INS system, it is designed to fuse GPS and IMU (a GINS system) with any odometry you provide. This can also be run as a standard GINS system by setting `use_odom:=false`. Noise parameters can be configured in `config/graph_params.yaml`. There is also a ROS2 branch which is still under active development. 
 
