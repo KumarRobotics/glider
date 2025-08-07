@@ -23,7 +23,7 @@ using gtsam::symbol_shorthand::B; // Bias
 using gtsam::symbol_shorthand::V; // Velocity
 using gtsam::symbol_shorthand::X; // Pose
 
-namespace glider
+namespace Glider
 {
 
 
@@ -31,7 +31,7 @@ class State : public Odometry
 {
     public:
         State() = default;
-        State(gtsam::Values& val, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized = true);
+        State(gtsam::Values& val, gtsam::Key key, double scale, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool initialized = true);
         State(gtsam::Values& val, bool initialized = true);
         
         static State Uninitialized();

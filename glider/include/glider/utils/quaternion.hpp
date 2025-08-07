@@ -5,16 +5,14 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <geometry_msgs/msg/quaternion.hpp>
 
-namespace glider
+namespace Glider
 {
 
 struct Quaternion
 {
     Quaternion() = default;
-    Quaternion(const double x, const double y, const double z, const double w);
-    Quaternion(const geometry_msgs::msg::Quaternion& q);    
+    Quaternion(double x, double y, double z, double w);
 
     friend Quaternion operator-(const Quaternion& q1, const Quaternion& q2);
     friend Quaternion operator*(const Quaternion& q1, const Quaternion& q2);

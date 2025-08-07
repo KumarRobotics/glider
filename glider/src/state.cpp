@@ -9,14 +9,14 @@
 #include "glider/core/odometry.hpp"
 #include "glider/utils/geodetics.hpp"
 
-using namespace glider;
+using namespace Glider;
 
-State::State(gtsam::Values& vals, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool init) : Odometry(vals, key, init)
+State::State(gtsam::Values& vals, gtsam::Key key, double scale, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool init) : Odometry(vals, key, scale, init)
 {
     gtsam::imuBias::ConstantBias bias = vals.at<gtsam::imuBias::ConstantBias>(B(key));
-
+        
     key_index_ = key;
-
+    scale_ = scale;
     accelerometer_bias_ = bias.accelerometer();
     gyroscope_bias_ = bias.gyroscope();
 

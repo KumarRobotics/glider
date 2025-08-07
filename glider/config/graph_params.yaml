@@ -1,16 +1,18 @@
-double:
-  acceleration_covariance: 0.1
-  gyroscope_covariance: 0.1
-  integration_covariance: 0.001
-  bias_covariance: 0.001
-  use_second_order: 0.0
-  origin_x: 0.0
-  origin_y: 0.0
-  gravity: 9.81
-  bias_num_measurements: 100.0
-  gps_noise: 2.5
-  distance_noise: 0.5
-  bearing_noise: 0.09
-  heading_noise: 0.09 #radians
-  lag_time: 10.0
-  use_differential_gps: 0.0
+accelerometer_covariance: 0.1
+gyroscope_covariance: 0.1
+integration_covariance: 0.001
+bias_covariance: 0.001
+use_second_order: 0.0
+origin_x: 482990.7375634047
+origin_y: 4421250.443879729
+gravity: 9.81
+bias_num_measurements: 100
+gps_noise: 2.5
+odom_noise: 0.5
+heading_noise: 0.5
+odom_orientation_noise: 0.1
+odom_translation_noise: 1.0
+odom_scale_noise: 50.0
+lag_time: 10.0
+imu_frame: "enu"
+scale_odom: true

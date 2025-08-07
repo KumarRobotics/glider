@@ -5,23 +5,15 @@
 
 #include "glider/utils/quaternion.hpp"
 
-namespace glider
+namespace Glider
 {
 
-Quaternion::Quaternion(const double w_in, const double x_in, const double y_in, const double z_in)
+Quaternion::Quaternion(double w_in, double x_in, double y_in, double z_in)
 {
     x = x_in;
     y = y_in;
     z = z_in;
     w = w_in;
-}
-
-Quaternion::Quaternion(const geometry_msgs::msg::Quaternion& q)
-{
-    x = q.x;
-    y = q.y;
-    z = q.z;
-    w = q.w;
 }
 
 Quaternion Quaternion::inverse() const
@@ -93,8 +85,6 @@ Quaternion Quaternion::fromRot3(Eigen::Matrix3d rot)
         y = (rot(1,2) + rot(2,1)) / s;
         z = 0.25 * s;
     }
-
-    return Quaternion(w, x, y, z);
 }
 
 }

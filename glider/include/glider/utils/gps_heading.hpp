@@ -5,7 +5,7 @@
 
 #include <cmath>
 
-namespace glider
+namespace Glider
 {
 namespace geodetics
 {

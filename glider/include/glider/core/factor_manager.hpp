@@ -8,6 +8,7 @@
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/GPSFactor.h>
 #include <gtsam/navigation/ImuFactor.h>
+#include <gtsam/geometry/Similarity3.h>
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/ExpressionFactorGraph.h>
@@ -26,6 +27,7 @@
 #include "imu_buffer.hpp"
 #include "state.hpp"
 #include "odometry.hpp"
+#include "glider/utils/parameters.hpp"
 
 #include <Eigen/Dense>
 #include <iostream>
@@ -39,25 +41,23 @@
 using gtsam::symbol_shorthand::B; // Bias
 using gtsam::symbol_shorthand::V; // Velocity
 using gtsam::symbol_shorthand::X; // Pose
+using gtsam::symbol_shorthand::S; // scale
 using gtsam::symbol_shorthand::R; // Rotation
-using gtsam::symbol_shorthand::P; // point
-using gtsam::symbol_shorthand::G; // gps
-using gtsam::symbol_shorthand::T; // translation
 
 // Helper function declarations
 Eigen::Vector3d vector3(double x, double y, double z);
 double nanosecInt2Float(int64_t timestamp);
 
-namespace glider 
+namespace Glider 
 {
 
 class FactorManager
 {
     public:
         FactorManager() = default;
-        FactorManager(const std::map<std::string, double>& config);
+        FactorManager(const Parameters& params);    
         
-        static boost::shared_ptr<gtsam::PreintegrationCombinedParams> defaultParams(double g);
+        static boost::shared_ptr<gtsam::PreintegrationCombinedParams> defaultImuParams(double g);
         
         void initializeGraph();
         void imuInitialize(const Eigen::Vector3d& accel_meas, const Eigen::Vector3d& gyro_meas, const Eigen::Vector4d& orient);
@@ -66,6 +66,7 @@ class FactorManager
 
         void addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps);
         void addOdometryFactor(int64_t timestamp, const Eigen::Vector3d& pose, const Eigen::Vector4d& quat);
+        void addOdometryFactor(int64_t timestamp, const gtsam::Pose3& pose);
         void addImuFactor(int64_t timestamp, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro, const Eigen::Vector4d& orient);
         void addHeadingFactor(int64_t timestamp, const double& heading);
 
@@ -73,21 +74,23 @@ class FactorManager
         State runner();
 
         gtsam::ExpressionFactorGraph getGraph();
+        double getInitialHeading() const;
         bool isInitialized();
 
     private:
         // parameters
-        std::map<std::string, double> config_;
         std::map<std::string, Eigen::MatrixXd> matrix_config_;
-        gtsam::ISAM2Params parameters_;
-        boost::shared_ptr<gtsam::PreintegrationCombinedParams> params_;
-        
+        gtsam::ISAM2Params isam_params_;
+        boost::shared_ptr<gtsam::PreintegrationCombinedParams> imu_params_;
+        Parameters params_;
+
         // IMU
         Eigen::Vector3d gravity_vec_;
         Eigen::MatrixXd bias_estimate_vec_;
         Eigen::Matrix3d imu2body_;
         gtsam::Matrix3 NED2ENU;
-        
+        Eigen::Vector4d orient_;
+        Eigen::Vector3d gyro_;
         int init_counter_;
         
         gtsam::imuBias::ConstantBias bias_;
@@ -98,7 +101,7 @@ class FactorManager
 
         // noise
         gtsam::noiseModel::Isotropic::shared_ptr prior_noise_;
-        gtsam::noiseModel::Isotropic::shared_ptr odom_noise_;
+        gtsam::noiseModel::Base::shared_ptr odom_noise_;
         gtsam::noiseModel::Isotropic::shared_ptr gps_noise_;
         gtsam::noiseModel::Base::shared_ptr heading_noise_;
 
@@ -117,6 +120,7 @@ class FactorManager
         double last_optimize_time_;
         double last_imu_time_;
         double last_gps_time_;
+        double estimated_scale_;
         State last_state_;
 
         // current state
@@ -126,12 +130,11 @@ class FactorManager
         // initialization
         bool initialized_;
         bool compose_odom_;
-        uint8_t start_odom_;
-        uint8_t heading_count_;
+        bool sim3_prior_added_; // dep
+        uint8_t start_odom_; // dep
+        uint8_t heading_count_; // dep
         gtsam::Rot3 initial_orientation_;
         gtsam::Pose3 initial_pose_for_odom_;
         gtsam::NavState initial_navstate_;
-
-        bool use_differential_gps_;
 };
 }

@@ -11,6 +11,23 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+option(BUILD_ROS "build the ros package" ON)
+option(BUILD_TESTS "build test scripts" OFF)
+
+if(BUILD_ROS)
+    message("Build Ros is enabled")
+    add_definitions(-DBUILD_ROS)
+else()
+    message("Build Ros is disabled")
+endif()
+
+if(BUILD_TESTS)
+    message("Build Tests is enabled")
+    add_definitions(-DBUILD_TESTS)
+else()
+    message("Build Tests is disabled")
+endif()
+
 # Find dependencies
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
@@ -39,119 +56,140 @@ include_directories(
 add_library(${PROJECT_NAME} SHARED
   src/imu_buffer.cpp
   src/factor_manager.cpp
-  src/params.cpp
+  src/parameters.cpp
   src/quaternion.cpp
   src/odometry.cpp
   src/state.cpp
-  ros/factor_node.cpp
+  src/glider.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
+    Eigen3::Eigen
     gtsam
     gtsam_unstable
     yaml-cpp
     tbb
+)
+
+if (BUILD_ROS)
+  message("Building ROS Package with Ament")
+  add_library(${PROJECT_NAME}_ros SHARED
+    ros/conversions.cpp
+    ros/glider_node.cpp
+
+  )
+
+  target_link_libraries(${PROJECT_NAME}_ros
+    Eigen3::Eigen
+    ${PROJECT_NAME}
+  )
+
+  ament_target_dependencies(${PROJECT_NAME}_ros 
+    rclcpp
+    rclcpp_components
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+  )
+
+  add_executable(${PROJECT_NAME}_node
+    ros/node.cpp
+  )
+
+  target_link_libraries(${PROJECT_NAME}_node
     rclcpp::rclcpp
-    rclcpp_components::component
-    ${sensor_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-)
+    ${PROJECT_NAME}
+    ${PROJECT_NAME}_ros
+  )
 
-rclcpp_components_register_nodes(${PROJECT_NAME} "glider::FactorNode")
-set(node_plugins "${node_plugins}glider::FactorNode;$<TARGET_FILE:${PROJECT_NAME}>\n")
+  rclcpp_components_register_nodes(${PROJECT_NAME} "GliderROS::GliderNode")
+  set(node_plugins "${node_plugins}GliderROS::GliderNode;$<TARGET_FILE:${PROJECT_NAME}>\n")
 
-# executables
-add_executable(glider_composition
-  ros/node.cpp
-)
+  install(DIRECTORY include/
+    DESTINATION include/
+  )
 
-target_link_libraries(glider_composition
-  rclcpp::rclcpp
-  ${PROJECT_NAME}
-)
+  # Install launch and config files
+  install(DIRECTORY
+    launch
+    config
+    DESTINATION share/${PROJECT_NAME}
+  )
 
-# Install include directories
-install(DIRECTORY include/
-  DESTINATION include/
-)
+  install(TARGETS
+    ${PROJECT_NAME}
+    ${PROJECT_NAME}_ros
+    EXPORT ${PROJECT_NAME}_targets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+  )
 
-# Install launch files if you have any
-install(DIRECTORY
-  launch
-  config
-  DESTINATION share/${PROJECT_NAME}
-)
+  install(TARGETS 
+    ${PROJECT_NAME}_node
+    DESTINATION lib/${PROJECT_NAME}
+  )
 
-install(TARGETS
-  ${PROJECT_NAME}
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-)
+  ament_export_targets(${PROJECT_NAME}_targets HAS_LIBRARY_TARGET)
+  ament_export_libraries(${PROJECT_NAME} ${PROJECT_NAME}_ros)
+  ament_export_include_directories(include)
+  ament_export_dependencies(
+    rclcpp
+    rclcpp_components
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    Eigen3
+  )
 
-install(TARGETS 
-  glider_composition
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-ament_export_include_directories(include)
-ament_export_dependencies(
-  rclcpp
-  rclcpp_components
-  sensor_msgs
-  geometry_msgs
-  nav_msgs
-  message_filters
-  tf2_eigen
-  Eigen3
-)
-
-ament_package()
+  ament_package()
+endif()
 
 # TESTS
-enable_testing()
-# build utm test
-add_executable(utm_test test/test_ll_to_utm.cpp)
-target_link_libraries(utm_test
-  GTest::GTest
-  GTest::Main
-  ${PROJECT_NAME}
-)
+if (BUILD_TESTS)
+    enable_testing()
+    # build utm test
+    add_executable(utm_test test/test_ll_to_utm.cpp)
+    target_link_libraries(utm_test
+      GTest::GTest
+      GTest::Main
+      ${PROJECT_NAME}
+    )
 
-#build params test
-add_executable(params_test test/test_params.cpp)
-target_link_libraries(params_test
-  GTest::GTest
-  GTest::Main
-  ${PROJECT_NAME}
-)
+    #build params test
+    add_executable(params_test test/test_params.cpp)
+    target_link_libraries(params_test
+      GTest::GTest
+      GTest::Main
+      ${PROJECT_NAME}
+    )
 
-#build factor tests
-add_executable(factor_test test/test_factors.cpp)
-target_link_libraries(factor_test
-  GTest::GTest
-  GTest::Main
-  ${PROJECT_NAME}
-)
+    #build factor tests
+    add_executable(factor_test test/test_factors.cpp)
+    target_link_libraries(factor_test
+      GTest::GTest
+      GTest::Main
+      ${PROJECT_NAME}
+    )
 
-add_executable(quaternion_test test/test_quaternion.cpp)
-target_link_libraries(quaternion_test
-  GTest::GTest
-  GTest::Main
-  ${PROJECT_NAME}
-)
+    add_executable(quaternion_test test/test_quaternion.cpp)
+    target_link_libraries(quaternion_test
+      GTest::GTest
+      GTest::Main
+      ${PROJECT_NAME}
+    )
 
-add_executable(heading_test test/test_heading.cpp)
-target_link_libraries(heading_test
-  GTest::GTest
-  GTest::Main
-  ${PROJECT_NAME}
-)
+    add_executable(heading_test test/test_heading.cpp)
+    target_link_libraries(heading_test
+      GTest::GTest
+      GTest::Main
+      ${PROJECT_NAME}
+    )
 
-include(GoogleTest)
-gtest_discover_tests(utm_test)
-gtest_discover_tests(params_test)
-gtest_discover_tests(factor_test)
-gtest_discover_tests(quaternion_test)
-gtest_discover_tests(heading_test)
+    include(GoogleTest)
+    gtest_discover_tests(utm_test)
+    gtest_discover_tests(params_test)
+    gtest_discover_tests(factor_test)
+    gtest_discover_tests(quaternion_test)
+    gtest_discover_tests(heading_test)
+endif()

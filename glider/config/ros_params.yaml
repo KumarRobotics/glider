@@ -1,6 +1,7 @@
-gldier_node:
+glider_node:
   ros__parameters:
-    rate: 100
+    rate: 100.0
     use_odom: true
     publish_nav_sat_fix: false
     utm_zone: "18S"
+    declination: 11.82

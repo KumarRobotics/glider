@@ -43,7 +43,7 @@ def generate_launch_description():
     # Create the glider node
     glider_node = Node(
         package='glider',
-        executable='glider_composition',
+        executable='glider_node',
         name='glider_node',
         output='screen',
         parameters=[
@@ -54,8 +54,9 @@ def generate_launch_description():
         ],
         remappings=[
             ('/gps', '/ublox/fix'),
-            ('/imu', '/imu/data'),
-            ('/odom', '/Odometry')
+            ('/imu', '/VN100T/imu'),
+            ('/mag', '/VN100T/mag'),
+            ('/odom', '/Odometry'),
         ]
     )
     

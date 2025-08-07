@@ -26,7 +26,7 @@
 #include <stdlib.h>
 //#include "ofMathConstants.h"
 
-namespace glider
+namespace Glider
 {
 namespace geodetics
 {
