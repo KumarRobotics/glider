@@ -7,9 +7,9 @@ origin_x: 482990.7375634047
 origin_y: 4421250.443879729
 gravity: 9.81
 bias_num_measurements: 100
-gps_noise: 2.5
+gps_noise: 2.0
 odom_noise: 0.5
-heading_noise: 0.5
+heading_noise: 0.1
 odom_orientation_noise: 0.1
 odom_translation_noise: 1.0
 odom_scale_noise: 50.0

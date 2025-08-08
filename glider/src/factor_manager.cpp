@@ -38,6 +38,7 @@ FactorManager::FactorManager(const Parameters& params)
     last_optimize_time_ = 0.0;
     last_imu_time_ = 0.0;
     imu_params_ = defaultImuParams(params.gravity);
+    gravity_vec_ = Eigen::Vector3d(0.0, 0.0, params.gravity);
 
     prior_noise_ = gtsam::noiseModel::Isotropic::Sigma(6, params.gps_noise); // maybe this can be odom noise??
     gps_noise_ = gtsam::noiseModel::Isotropic::Sigma(3, params.gps_noise);
@@ -148,8 +149,9 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
     }
                                   
     if (key_index_ > 0) 
-    { 
-        std::lock_guard<std::mutex> lock(std::mutex);
+    {
+        static std::mutex imu_mutex;
+        std::unique_lock<std::mutex> lock(imu_mutex);
         
         graph_.add(gtsam::CombinedImuFactor(X(key_index_),
                                             V(key_index_),
@@ -167,6 +169,8 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps)
         smoother_timestamps_[X(key_index_)] = timestamp_f;
         smoother_timestamps_[V(key_index_)] = timestamp_f;
         smoother_timestamps_[B(key_index_)] = timestamp_f;
+
+        lock.unlock();
     }
 
     gtsam::Rot3 imu_rot = gtsam::Rot3(orient_(0), orient_(1), orient_(2), orient_(3));
@@ -246,7 +250,8 @@ void FactorManager::addImuFactor(int64_t timestamp, const Eigen::Vector3d& accel
     double timestamp_f = nanosecInt2Float(timestamp);
     gtsam::Quaternion q(orient(0), orient(1), orient(2), orient(3));
 
-    std::lock_guard<std::mutex> lock(std::mutex);
+    static std::mutex imu_mutex;
+    std::lock_guard<std::mutex> lock(imu_mutex);
     //imu_buffer_.add(timestamp_f, accel, gyro, orient);
 
     //Eigen::Vector3d accel_meas = accel;
