@@ -3,8 +3,8 @@ gyroscope_covariance: 0.1
 integration_covariance: 0.001
 bias_covariance: 0.001
 use_second_order: 0.0
-origin_x: 482990.7375634047
-origin_y: 4421250.443879729
+origin_x: 0.0 
+origin_y: 0.0
 gravity: 9.81
 bias_num_measurements: 100
 gps_noise: 2.0
