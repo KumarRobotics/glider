@@ -19,6 +19,7 @@ GliderNode::GliderNode(const rclcpp::NodeOptions& options) : rclcpp::Node("glide
     declare_parameter("origin_easting", 0.0);
     declare_parameter("origin_northing", 0.0);
     declare_parameter("viz", false);
+    declare_parameter("calib_path", ".");
 
     // Get parameters
     double freq = this->get_parameter("rate").as_double();
@@ -45,7 +46,9 @@ GliderNode::GliderNode(const rclcpp::NodeOptions& options) : rclcpp::Node("glide
     origin_easting_ = this->get_parameter("origin_easting").as_double();
     origin_northing_ = this->get_parameter("origin_northing").as_double();
 
-    glider_ = std::make_unique<Glider::Glider>(path);
+    std::string cpath = this->get_parameter("calib_path").as_string();
+
+    glider_ = std::make_unique<Glider::Glider>(path, cpath);
 
     imu_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     gps_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

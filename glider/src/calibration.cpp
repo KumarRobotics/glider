@@ -1,0 +1,177 @@
+/*!
+* Jason Hughes
+* Septemeber 2025
+*
+* Calibrate the heaging from IMU against differential gps
+*/
+
+#include "glider/utils/calibration.hpp"
+
+using namespace Glider;
+
+HeadingCalibrator::HeadingCalibrator(const std::string& path)
+{
+    params_ = Parameters::Load(path);
+    std::cout << "[HEADING-CALIBRATION] Calibrator initialized, ready for measurments" << std::endl;
+}
+
+void HeadingCalibrator::addGPSMeasurement(const int64_t timestamp, const Eigen::Vector3d meas)
+{
+    if (gps_measurements_.empty())
+    {
+        std::cout << "[HEADING-CALIBRATION] Starting Calibration, gathering measurements" << std::endl;
+        gps_measurements_.push_back(GPSStamped(timestamp, meas));
+        std::cout << "[HEADING-CALIBRATION] Adding DGPS Measurment: " << gps_measurements_.size()-1 << "/" << params_.num_measurements-1 << std::endl;
+    }
+    else if (gps_measurements_.size() < params_.num_measurements)
+    {
+        double distance = measureDistance(meas);
+        if (distance >= params_.min_distance)
+        {
+            Eigen::Vector3d prev_gps = gps_measurements_.back().gps;
+            double gps_heading_enu = geodetics::gpsHeading(prev_gps(0), prev_gps(1), meas(0), meas(1));
+            double gps_heading = geodetics::geodeticToENU(gps_heading_enu);
+            gps_measurements_.push_back(GPSStamped(timestamp, meas, gps_heading));
+            std::cout << "[HEADING-CALIBRATION] Adding DGPS Measurment: " << gps_measurements_.size()-1 << "/" << params_.num_measurements-1 << std::endl;
+        }
+        else
+        {
+            //std::cout << "[HEADING-CALIBRATION] Not enough motion detected" << std::endl;
+        }
+    }
+    else
+    {
+        heading_diff_ = calibrate();
+        calibrated_ = true;
+    }
+}
+
+void HeadingCalibrator::addMagMeasurement(const int64_t timestamp, const Eigen::Vector3d meas)
+{
+    mag_measurements_.push_back(MagStamped(timestamp, meas));
+}
+
+void HeadingCalibrator::addIMUMeasurement(const int64_t timestamp, const Eigen::Vector4d meas)
+{
+    if (gps_measurements_.size() > 1) 
+    {
+        imu_measurements_.push_back(IMUStamped(timestamp, meas));
+    }
+    else
+    {
+        if (print_)
+        {
+            Eigen::Quaterniond quat(meas(0), meas(1), meas(2), meas(2));
+            Eigen::Vector3d euler = quat.toRotationMatrix().eulerAngles(0, 1, 2);
+            double heading = euler(2);
+            std::cout << "[HEADING-CALIBRATOR] Initial IMU heading: " << geodetics::headingRadiansToDegrees(heading) << std::endl;
+            print_ = false;
+        }
+    }
+}
+
+Eigen::Vector4d HeadingCalibrator::applyCalibration(const Eigen::Vector4d& meas) const
+{
+    if (!calibrated_) throw std::runtime_error("Calibration must be complete to apply calibration");
+    Eigen::Quaterniond q_input(meas(0), meas(1), meas(2), meas(3));
+    Eigen::Quaterniond q_diff(Eigen::AngleAxisd(heading_diff_, Eigen::Vector3d::UnitZ()));
+    Eigen::Quaterniond q_applied = q_diff * q_input;
+    
+    return Eigen::Vector4d(q_applied.w(), q_applied.x(), q_applied.y(), q_applied.z());
+}
+
+bool HeadingCalibrator::isCalibrated() const
+{
+    return calibrated_;
+}
+
+template <AngleUnit U>
+double HeadingCalibrator::getHeadingDifference() const
+{
+    if constexpr(U == AngleUnit::Radians)
+    {
+        return heading_diff_;
+    }
+    else if constexpr(U == AngleUnit::Degrees)
+    {
+        return geodetics::headingRadiansToDegrees(heading_diff_);
+    }
+}
+
+double HeadingCalibrator::calibrate()
+{
+    double avg_heading_diff = 0.0;
+    double heading_diff_sum = 0.0;
+    for (size_t i = 1; i < gps_measurements_.size(); ++i)
+    {
+        GPSStamped gps = gps_measurements_[i];
+        IMUStamped imu = getProximalIMUMeasurement(gps.timestamp);
+
+        double heading_diff = gps.heading - imu.heading;
+
+        std::cout << "[HEADING-CALIBRATOR] Comparing measurement " << i  << "/" << params_.num_measurements-1 << " DPGS heading " << geodetics::headingRadiansToDegrees(gps.heading) << " IMU Heading " << geodetics::headingRadiansToDegrees(imu.heading) << std::endl;
+        heading_diff_sum += heading_diff;
+        avg_heading_diff = heading_diff_sum / static_cast<double>(i);
+    }
+
+    return avg_heading_diff;
+}
+
+HeadingCalibrator::IMUStamped HeadingCalibrator::getProximalIMUMeasurement(int64_t gps_timestamp) const
+{
+    IMUStamped closest_imu_measurement;
+    int64_t smallest_timestamp_diff = std::numeric_limits<int64_t>::max();
+    for (const IMUStamped& imu : imu_measurements_)
+    {
+        if ((imu.timestamp - gps_timestamp) < smallest_timestamp_diff)
+        {
+            smallest_timestamp_diff = imu.timestamp;
+            closest_imu_measurement = imu;
+        }
+    }   
+    return closest_imu_measurement;
+}
+
+
+double HeadingCalibrator::measureDistance(const Eigen::Vector3d& meas) const
+{
+    double easting1, northing1;
+    char zone[4];
+    geodetics::LLtoUTM(meas(0), meas(1), northing1, easting1, zone);
+    Eigen::Vector2d meas1(easting1, northing1);
+
+    Eigen::Vector3d recent_gps = gps_measurements_.back().gps;
+    double easting2, northing2;
+    geodetics::LLtoUTM(recent_gps(0), recent_gps(1), northing2, easting2, zone);
+    Eigen::Vector2d meas2(easting2, northing2);
+    
+    return (meas1 - meas2).norm();
+}   
+
+
+HeadingCalibrator::Parameters::Parameters(const std::string& path)
+{
+    try
+    {
+        YAML::Node config = YAML::LoadFile(path);
+        num_measurements = config["num_measurements"].as<size_t>() + 1;
+        min_distance = config["min_distance"].as<double>();
+    }
+    catch (const YAML::Exception& e)
+    {
+        throw std::runtime_error("Error loading YAML File at : " + path + " : " + std::string(e.what()));
+    }
+    catch (const std::exception& e)
+    {
+        throw std::runtime_error("Error parsing YAML configuration at: " + path + " : " + std::string(e.what()));
+    }
+}
+
+HeadingCalibrator::Parameters HeadingCalibrator::Parameters::Load(const std::string& path)
+{
+    Parameters params(path);
+    return params;
+}
+
+template double HeadingCalibrator::getHeadingDifference<AngleUnit::Degrees>() const;
+template double HeadingCalibrator::getHeadingDifference<AngleUnit::Radians>() const;

@@ -106,7 +106,7 @@ void FactorManager::imuInitialize(const Eigen::Vector3d& accel_meas, const Eigen
         initial_orientation_ = gtsam::Rot3(init_orient_matrix);
         current_heading_ = initial_orientation_.yaw();
         double heading_deg = geodetics::headingRadiansToDegrees(current_heading_);
-        std::cout << "[GLIDER-MONO] Initialized IMU with heading: " << heading_deg << std::endl;
+        std::cout << "[GLIDER] Initialized IMU with heading: " << heading_deg << std::endl;
         initialized_ = true;
     }
 }

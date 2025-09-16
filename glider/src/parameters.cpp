@@ -33,6 +33,7 @@ Glider::Parameters::Parameters(const std::string& path)
 
         frame = config["imu_frame"].as<std::string>();
         scale_odom = config["scale_odom"].as<bool>();
+        calibrate = config["calibrate"].as<bool>();
         t_imu_gps(0) = config["gps_to_imu"]["x"].as<double>();
         t_imu_gps(1) = config["gps_to_imu"]["y"].as<double>();
         t_imu_gps(2) = config["gps_to_imu"]["z"].as<double>();

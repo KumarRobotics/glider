@@ -11,19 +11,20 @@
 namespace Glider
 {
 
-Glider::Glider(const std::string& path) 
+Glider::Glider(const std::string& path, const std::string& cpath) 
 {
     Parameters params = Parameters::Load(path);
     factor_manager_ = FactorManager(params);
+    calibrator_ = HeadingCalibrator(cpath);
 
     frame_ = params.frame;
     correct_imu_ = params.correct_imu;
     t_imu_gps_ = params.t_imu_gps;
-
+    calibrate_ = params.calibrate;
     // IMU transformations
     ned_to_enu_rot_ << 0.0, 1.0, 0.0, 
                        1.0, 0.0, 0.0, 
-                       0.0, 0.0, -1.0;
+                       0.0, 0.0, 1.0;
     ned_to_enu_quat_ = Eigen::Quaterniond(ned_to_enu_rot_);
 
     prev_pose_ = Eigen::Isometry3d::Identity();
@@ -32,6 +33,7 @@ Glider::Glider(const std::string& path)
     initial_heading_ = 0.0;
     set_initial_heading_ = true;
 
+    std::cout << "[GLIDER] Calibrating IMU Heading " << std::boolalpha << calibrate_ << std::endl;
     std::cout << "[GLIDER] Using IMU frame: " << frame_ << std::endl;
     std::cout << "[GLIDER] Correcting IMU heading with mag: " << std::boolalpha << correct_imu_ << std::endl;
     std::cout << "[GLIDER] Glider initialized" << std::endl;
@@ -66,6 +68,18 @@ Eigen::Vector4d Glider::correctImuOrientation(const Eigen::Vector4d orient)
 
 void Glider::addGPS(int64_t timestamp, Eigen::Vector3d& gps)
 {
+    if (calibrate_ && !calibrator_.isCalibrated())
+    {
+        calibrator_.addGPSMeasurement(timestamp, gps);
+        return;
+    }
+    if (calibrate_ && calibrator_.isCalibrated())
+    {
+        heading_diff_ = calibrator_.getHeadingDifference<AngleUnit::Radians>();
+        std::cout << "[GLIDER] Differential GPS -- IMU calibration complete" << std::endl;
+        std::cout << "[GLIDER] Calibrated with heading difference: " << calibrator_.getHeadingDifference<AngleUnit::Degrees>() << std::endl;
+        calibrate_ = false;
+    }
     // transform from GPS To UTM
     Eigen::Vector3d meas = Eigen::Vector3d::Zero();
     
@@ -96,15 +110,14 @@ void Glider::addIMU(int64_t timestamp, Eigen::Vector3d& accel, Eigen::Vector3d& 
         Eigen::Vector3d accel_enu = ned_to_enu_rot_ * accel;
         Eigen::Vector3d gyro_enu = ned_to_enu_rot_ * gyro;
         
-        if (correct_imu_)
+        if (calibrate_ && !calibrator_.isCalibrated())
         {
-            Eigen::Vector4d quat_corr = correctImuOrientation(imu_vec);
-            factor_manager_.addImuFactor(timestamp, accel_enu, gyro_enu, quat_corr);
+            calibrator_.addIMUMeasurement(timestamp, imu_vec);
+            return;
         }
-        else
-        {
-            factor_manager_.addImuFactor(timestamp, accel_enu, gyro_enu, imu_vec);
-        }
+        //Eigen::Vector4d orient_calibrated  = calibrator_.applyCalibration(imu_vec);
+        //factor_manager_.addImuFactor(timestamp, accel_enu, gyro_enu, orient_calibrated);
+        factor_manager_.addImuFactor(timestamp, accel, gyro, imu_vec);
     }
     else if (frame_ == "enu")
     {

@@ -1,5 +1,5 @@
-accelerometer_covariance: 0.00001
-gyroscope_covariance: 0.00001
+accelerometer_covariance: 0.0001
+gyroscope_covariance: 0.0001
 integration_covariance: 0.001
 bias_covariance: 0.001
 use_second_order: 0.0
@@ -12,9 +12,10 @@ odom_orientation_noise: 0.1
 odom_translation_noise: 1.0
 odom_scale_noise: 50.0
 lag_time: 10.0
-imu_frame: "enu"
-scale_odom: true
-correct_imu: true
+imu_frame: "ned"
+scale_odom: false
+correct_imu: false 
+calibrate: true
 gps_to_imu:
   x: 0.0
   y: 0.0

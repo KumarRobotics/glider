@@ -38,6 +38,7 @@ struct Parameters
 
     bool scale_odom;
     bool correct_imu;
+    bool calibrate;
     Eigen::Vector3d t_imu_gps;
 };
 }

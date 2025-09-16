@@ -61,6 +61,8 @@ add_library(${PROJECT_NAME} SHARED
   src/odometry.cpp
   src/state.cpp
   src/glider.cpp
+  src/calibration.cpp
+  src/gps_heading.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
