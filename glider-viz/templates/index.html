@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Glider Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <style>
+        #map {
+            height: 90vh;
+            width: 100%;
+        }
+        h2 {
+            font-family: 'Courier New', monospace;
+        }
+        /* Legend Styles */
+        .info.legend {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .info.legend h4 {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        /* Custom icon styles */
+        .custom-arrow-icon {
+            background: none !important;
+            border: none !important;
+        }
+        /* Smooth rotation transition */
+        .custom-arrow-icon svg {
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h2>Glider Visualizer</h2>
+    <div id="map"></div>
+
+    <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+</body>
+</html>

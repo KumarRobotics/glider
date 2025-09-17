@@ -1,0 +1,10 @@
+glider_viz_node:
+  ros__parameters:
+    app:
+      ip_address: '127.0.0.1'
+      port: 5000
+    map:
+      lat: 39.94136
+      lon: -75.199492
+      zone_number: 18
+      zone_id: 'S'
