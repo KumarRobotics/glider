@@ -125,20 +125,27 @@ void GliderNode::dgpsCallback(const gps_msgs::msg::GPSFix::ConstSharedPtr msg)
     LOG_FIRST_N(INFO, 1) << "[GLIDER] Received DGPS measurement";
     std::pair<Eigen::Vector3d, Eigen::Vector2d> dgps = GliderROS::Conversions::rosToEigen<std::pair<Eigen::Vector3d, Eigen::Vector2d>>(*msg);
     int64_t timestamp = getTime(msg->header.stamp);
-
-    glider_->addGpsWithHeading(timestamp, dgps.first, dgps.second); 
     
-    current_state_ = glider_->optimize(timestamp);
+    //glider_->addGpsWithHeading(timestamp, dgps.first, dgps.second); 
+    heading_ = dgps.second;
+    //current_state_ = glider_->optimize(timestamp);
 }
 
 void GliderNode::gpsCallback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg)
 {
     LOG_FIRST_N(INFO, 1) << "[GLIDER] Recieved GPS measurement";
     Eigen::Vector3d gps = GliderROS::Conversions::rosToEigen<Eigen::Vector3d>(*msg);
-
+    if (!init_alt_) {
+        initial_alt_ = gps.z();
+        gps = Eigen::Vector3d(gps.x(), gps.y(), 0.0);
+        init_alt_ = true;
+    } else {
+        double alt = gps.z() - initial_alt_;
+        gps = Eigen::Vector3d(gps.x(), gps.y(), alt);
+    }
     int64_t timestamp = getTime(msg->header.stamp);
 
-    glider_->addGps(timestamp, gps);
+    glider_->addGpsWithHeading(timestamp, gps, heading_);
 
     current_state_ = glider_->optimize(timestamp);
 }

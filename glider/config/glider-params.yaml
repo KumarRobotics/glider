@@ -1,17 +1,17 @@
 imu:
   covariances:
-    accelerometer: 0.00001
-    gyroscope: 0.00001
+    accelerometer: 0.1
+    gyroscope: 0.1
     integration: 0.001
-    heading: 0.09 
+    heading: 100 
     roll_pitch: 0.001
     bias: 0.001
   frame: "enu"
 gps: 
-  covariance: 2.0
+  covariance: 10.0
 dgps:
   enable: true
-  covariance: 0.03
+  covariance: 0.1
 dgpsfm:
   enable: false
   integration_threshold: 1.0

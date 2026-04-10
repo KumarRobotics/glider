@@ -42,7 +42,6 @@ class GliderNode : public rclcpp::Node
         void imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg);
         void magCallback(const sensor_msgs::msg::MagneticField::ConstSharedPtr msg);
         void odomCallback(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
-        void poseCallback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr msg);
 
         // utility functions
         int64_t getTime(const builtin_interfaces::msg::Time& stamp) const;
@@ -58,7 +57,6 @@ class GliderNode : public rclcpp::Node
         rclcpp::Subscription<sensor_msgs::msg::Imu>::ConstSharedPtr imu_sub_;
         rclcpp::Subscription<sensor_msgs::msg::MagneticField>::ConstSharedPtr mag_sub_;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::ConstSharedPtr odom_sub_;
-        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::ConstSharedPtr pose_sub_;
 
         // groups
         rclcpp::CallbackGroup::SharedPtr imu_group_;
@@ -80,6 +78,9 @@ class GliderNode : public rclcpp::Node
         double origin_easting_;
         double origin_northing_;
         double freq_;
+        Eigen::Vector2d heading_;
+        double initial_alt_;
+        bool init_alt_{false};
 
         // tracker
         Glider::OdometryWithCovariance current_state_;
