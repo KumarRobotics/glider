@@ -2,7 +2,7 @@
 * Jason Hughes
 * May 2025
 *
-* Struct to keep track of the robots odometry, 
+* Struct to keep track of the robots odometry,
 * not its full state.
 */
 
@@ -20,7 +20,7 @@ Odometry::Odometry(gtsam::Values& vals, int64_t timestamp, gtsam::Key key, bool 
 
     altitude_ = pose_.translation().z();
     heading_ = pose_.rotation().yaw();
-   
+
     timestamp_ = timestamp;
     initialized_ = init;
 }
@@ -50,6 +50,11 @@ bool Odometry::isInitialized() const
      return initialized_;
 }
 
+bool Odometry::isGpsOffsetInitialized() const
+{
+    return is_gps_offset_initialized_;
+}
+
 gtsam::NavState Odometry::getNavState() const
 {
     gtsam::NavState ns(pose_, velocity_);
@@ -64,7 +69,7 @@ int64_t Odometry::getTimestamp() const
 template<typename T>
 T Odometry::getPose() const
 {
-    if constexpr (std::is_same_v<T, gtsam::Pose3>) 
+    if constexpr (std::is_same_v<T, gtsam::Pose3>)
     {
         return pose_;
     }
@@ -128,7 +133,7 @@ T Odometry::getPosition() const
         return p;
     }
     else
-    {      
+    {
         static_assert(std::is_same_v<T, gtsam::Point3> ||
                       std::is_same_v<T, Eigen::Vector3d>, "unsupported type");
     }
@@ -139,7 +144,7 @@ T Odometry::getVelocity() const
 {
     if constexpr (std::is_same_v<T, gtsam::Point3>)
     {
-        return velocity_; 
+        return velocity_;
     }
     else if constexpr (std::is_same_v<T, Eigen::Vector3d>)
     {
@@ -147,7 +152,7 @@ T Odometry::getVelocity() const
         return v;
     }
     else
-    {   
+    {
         static_assert(std::is_same_v<T, gtsam::Point3> ||
                       std::is_same_v<T, Eigen::Vector3d>, "unsupported type");
     }
@@ -202,9 +207,9 @@ double Odometry::getLongitude(const char* zone)
     return longitude_;
 }
 
-std::pair<double, double> Odometry::getLatLon(const char* zone)
+std::pair<double, double> Odometry::getLatLon(const char* zone, const Eigen::Vector3d& offset)
 {
-    geodetics::UTMtoLL(position_.y(), position_.x(), zone, latitude_, longitude_);
+    geodetics::UTMtoLL(position_.y() + offset(1), position_.x() + offset(0), zone, latitude_, longitude_);
     return std::make_pair(latitude_, longitude_);
 }
 
@@ -221,7 +226,7 @@ double Odometry::getAltitude() const
 double Odometry::getHeadingDegrees() const
 {
     double heading_deg = (heading_ * 180.0) / M_PI;
-    if (heading_deg < 0.0) 
+    if (heading_deg < 0.0)
     {
         heading_deg += 360.0;
     }
@@ -236,6 +241,11 @@ double Odometry::getHeadingDegrees() const
 void Odometry::setInitializedStatus(bool init)
 {
     initialized_ = init;
+}
+
+void Odometry::setGpsOffsetInitialized(bool init)
+{
+    is_gps_offset_initialized_ = init;
 }
 
 template gtsam::Pose3 Odometry::getPose<gtsam::Pose3>() const;

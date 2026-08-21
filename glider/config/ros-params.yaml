@@ -2,10 +2,23 @@ glider_node:
   ros__parameters:
     publishers:
       rate: 0.0
-      nav_sat_fix: false
+      nav_sat_fix: true
+      utm_zone: "18S"
+      map_frame: "map"
+      base_link_frame: "base_link"
       viz:
         use: true
         origin_easting: 753912.0063845584
         origin_northing: 3385461.6073698294
     subscribers:
-      use_odom: false
+      use_odom: true
+      use_gps: false
+      use_dgps: true
+      imu_topic: "/vectornav/imu"
+      odom_topic: "/rko_lio/odometry"
+      gps_topic: "/ublox/fix"
+      dgps_topic: "/sept/enu/dfix"
+      # Reject fixes when any reported position variance exceeds this value.
+      gps_rejection_variance: 1.0
+      max_stamp_skew_sec: 1.0
+      gps_loss_timeout_sec: 3.0

@@ -3,10 +3,10 @@
  * Jason Hughes
  * May 2025
  *
- * Struct to keep track of the odometry output 
+ * Struct to keep track of the odometry output
  * from the factor graph. This keeps track of
  * everything the gtsam NavState does but adds
- * a timestamp, gyroscope reading and initilization 
+ * a timestamp, gyroscope reading and initilization
  * status.
  */
 
@@ -35,17 +35,17 @@ namespace Glider
 class Odometry
 {
     public:
-        /*! @brief default constructor of Odometry object, note that this 
+        /*! @brief default constructor of Odometry object, note that this
          *  sets initialized_ to false */
         Odometry() = default;
-        /*! @brief initialize the Odometry from the result of optimization, designed to used 
+        /*! @brief initialize the Odometry from the result of optimization, designed to used
          *  by child class upon inheritance
          *  @param val: results from gtsam optimization
          *  @param timestamp: timestamp passed to the optimizer
          *  @param key: current key_index to get current results from val
-         *  @param init: should this constuctor call initialize the odometry */  
+         *  @param init: should this constuctor call initialize the odometry */
         Odometry(gtsam::Values& val, int64_t timestamp, gtsam::Key key, bool init = true);
-        /*! @brief initialize the Odometry from a NavState, likely from calling the the pim 
+        /*! @brief initialize the Odometry from a NavState, likely from calling the the pim
          *  predict
          *  @param ns: the current NavState from gtsam
          *  @param timestamp: the current timestamp
@@ -60,7 +60,7 @@ class Odometry
          *  @type T: std::pair<Eigen::Vector3d, Eigen::Quaterniond> */
         template<typename T>
         T getPose() const;
-        /*! @brief gets the 3D positon from odometry 
+        /*! @brief gets the 3D positon from odometry
          *  @return position in 3D in UTM ENU frame (easting, northing, altitude)
          *  @type T: gtsam::Point3
          *  @type T: Eigen::Vector3d*/
@@ -71,7 +71,7 @@ class Odometry
          *  @type T: gtsam::Rot3
          *  @type T: gtsam::Quaternion
          *  @type T: Eigen::Vector4d
-         *  @type T: Eigen::Quaterniond */ 
+         *  @type T: Eigen::Quaterniond */
         template<typename T>
         T getOrientation() const;
         /* @brief gets the 3D velocity from odometry
@@ -102,6 +102,10 @@ class Odometry
          *  @return true if odometry is initialized otherwise false */
         bool isInitialized() const;
 
+        /*! @brief check if the gps offset is initialized
+         *  @return true if it is otherwise false */
+        bool isGpsOffsetInitialized() const;
+
         /*! @brief get the latitude of the current position
          *  @param zone: the utm zone ex "18S"
          *  @return the latitude in degrees decimal from the UTM position */
@@ -112,9 +116,9 @@ class Odometry
         double getLongitude(const char* zone);
         /*! @brief get the latitude and longitude as a pair
          *  @param zone: the utm zone, ex "18S"
-         *  @return latitude and longitude in degrees decimal as a pair 
+         *  @return latitude and longitude in degrees decimal as a pair
          *  where lat is first and lon is second */
-        std::pair<double, double> getLatLon(const char* zone);
+        std::pair<double, double> getLatLon(const char* zone, const Eigen::Vector3d& offset = Eigen::Vector3d::Zero());
         /*! @brief get the timestamp of the odometry
          *  @return nanosec time in integer format */
         int64_t getTimestamp() const;
@@ -124,10 +128,15 @@ class Odometry
          *  otherwise false */
         void setInitializedStatus(bool init);
 
+        /*! @brief set the gps offset initalization status
+         *  @param init: true if you want the gps offset to be initialized
+         *  otherwise false */
+        void setGpsOffsetInitialized(bool init);
+
     protected:
         /*! @brief a helper function to convert gtsam Pose3 to a pair
-         *  of Eigen objects 
-         *  @return a pair of Eigen objects where first is position and second in orientation as a quaternion 
+         *  of Eigen objects
+         *  @return a pair of Eigen objects where first is position and second in orientation as a quaternion
          *  @type TF: Eigen::Vector3d
          *  @type TS: Eigen::Vector4d
          *  @type TS: Eigen::Quaterniond */
@@ -138,7 +147,7 @@ class Odometry
         double latitude_;
         // @brief the longitude from the input UTM pose
         double longitude_;
-                
+
         // @brief the 3D velocity in m/s
         gtsam::Point3 velocity_;
         // @brief the 3D position in UTM and ENU frames
@@ -157,5 +166,7 @@ class Odometry
         int64_t timestamp_;
         // @brief is this initialized, default to false
         bool initialized_{false};
+        // @brief is the gps offset initialized, default to false
+        bool is_gps_offset_initialized_{false};
 };
 } // namespace glider

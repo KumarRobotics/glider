@@ -3,12 +3,14 @@ imu:
     accelerometer: 0.00001
     gyroscope: 0.00001
     integration: 0.001
-    heading: 0.09 
+    heading: 0.09
     roll_pitch: 0.001
     bias: 0.001
   frame: "enu"
-gps: 
+gps:
   covariance: 2.0
+odom:
+  covariance: 0.1
 dgps:
   enable: true
   covariance: 0.03
@@ -24,9 +26,30 @@ logging:
   stdout: true
   directory: "/tmp/glider"
 optimizer:
-  smooth: true
+  # Set true to use the incremental fixed-lag smoother instead of iSAM2.
+  smooth: false
   lag_time: 5.0
-gps_to_imu:
-  x: 0.0
-  y: 0.0
-  z: 0.0
+# All sensor locations are expressed relative to the LiDAR using ROS FLU axes:
+# +X forward, +Y left, +Z up. Thus right/down/behind are negative Y/Z/X.
+# Translations are metres; rotations are XYZ roll/pitch/yaw in degrees.
+extrinsics:
+  reference_frame: "os_sensor"
+  body:
+    frame: "rko_base_link"
+    translation: {x: -0.2, y: 0.0, z: -0.338}
+    rotation_rpy_deg: {roll: 0.0, pitch: 0.0, yaw: 0.0}
+  lidar:
+    frame: "os_sensor"
+    translation: {x: 0.0, y: 0.0, z: 0.0}
+    rotation_rpy_deg: {roll: 0.0, pitch: 0.0, yaw: 0.0}
+  imu:
+    frame: "vectornav"
+    # 12 cm right and 17 cm down from the LiDAR.
+    translation: {x: 0.0, y: -0.12, z: -0.17}
+    rotation_rpy_deg: {roll: 90.6107, pitch: 3.1974, yaw: -148.5656}
+  gps:
+    frame: "navsat_link"
+    # 25 cm directly behind the LiDAR along the X axis.
+    translation: {x: -0.25, y: 0.0, z: 0.0}
+    rotation_rpy_deg: {roll: 0.0, pitch: 0.0, yaw: 0.0}
+    heading_offset_deg: 0.0

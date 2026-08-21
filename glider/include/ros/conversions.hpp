@@ -37,10 +37,10 @@ class Conversions
         static Output eigenToRos(const Input& vec);
 
         template<typename Output>
-        static Output odomToRos(Glider::Odometry& odom, const char* zone = nullptr);
+        static Output odomToRos(Glider::Odometry& odom, std::string frame_id = "enu", const char* zone = nullptr, const Eigen::Vector3d& offset = Eigen::Vector3d::Zero());
 
         template<typename Output>
-        static Output odomToRos(Glider::OdometryWithCovariance& odom_wc, const char* zone = nullptr);
+        static Output odomToRos(Glider::OdometryWithCovariance& odom_wc, std::string frame_id = "enu", const char* zone = nullptr, const Eigen::Vector3d& offset = Eigen::Vector3d::Zero());
 
         template<typename T>
         static void addCovariance(const Glider::OdometryWithCovariance& odom_wc, T& msg);
@@ -48,7 +48,7 @@ class Conversions
         static std::chrono::milliseconds hzToDuration(const double freq);
 
     private:
-        
+
         struct RosToEigen
         {
             static Eigen::Vector3d vector3Convert(const geometry_msgs::msg::Vector3& vec);

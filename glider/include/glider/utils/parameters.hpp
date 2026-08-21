@@ -44,8 +44,10 @@ struct Parameters
     // @brief covariance of the IMU's bias estimate
     double bias_cov;
     // @brief covariance of the GPS position estimate
-    // TODO make this gps_cov to match 
+    // TODO make this gps_cov to match
     double gps_noise;
+    // @brief covariance of the odometry position estimate
+    double odom_cov;
 
     // @brief gravity as read from your IMU
     double gravity;
@@ -61,7 +63,7 @@ struct Parameters
     // @brief if true this logs to stdout and log file otherwise it logs
     // just to a file
     bool log;
-    // @brief the directory to save the log file, glog needs an 
+    // @brief the directory to save the log file, glog needs an
     // absolute path
     std::string log_dir;
 
@@ -70,7 +72,7 @@ struct Parameters
     bool smooth;
     // @brief amount of time in seconds for the fixed lag smoother to
     // smooth over.
-    double lag_time; 
+    double lag_time;
 
     // @brief wheather or not to integrate differential gps from motion heading,
     // if false orientation from the IMU will be integrated
@@ -78,13 +80,16 @@ struct Parameters
     // @brief velocity in m/s that the robot should be moving at to integrate
     // dgpsfm
     double dgpsfm_threshold;
-    // @brief heading noise for differential gps from motion 
+    // @brief heading noise for differential gps from motion
     double dgpsfm_cov;
 
     bool use_dgps;
     double dgps_cov;
-
-    // @brief translation from the GPS to the IMU
-    Eigen::Vector3d t_imu_gps;
+    // Sensor poses transformed from the configured reference frame to body.
+    Eigen::Vector3d t_body_imu;
+    Eigen::Matrix3d r_body_imu;
+    Eigen::Vector3d t_body_gps;
+    double gps_heading_offset;
+    std::string body_frame;
 };
 }

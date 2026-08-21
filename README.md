@@ -3,8 +3,8 @@
 
 ![Jazzy CI](https://github.com/KumarRobotics/glider/actions/workflows/jazzy-ci.yml/badge.svg?branch=ros2)
 
-Glider is a G-INS system built on [GTSAM](https://github.com/borglab/gtsam). It currently takes in GPS and 9-DOF IMU and provides a full
-state estimate up to the rate of you IMU. Glider is designed to be configured to your system. 
+Glider is a G-INS system built on [GTSAM](https://github.com/borglab/gtsam). It accepts GPS, a 9-DOF IMU, and optional local odometry, and provides a full
+state estimate at up to the IMU rate. Glider is designed to be configured for a specific sensor suite.
 
 ## Building Glider
 To run glider you can use the provided docker images, ROS2 jazzy and humble are both supported, simply use the `build.bash` and `run.bash` files. You can mounted volumes in the run files if necessary. If you want to inlcude this in another ROS2 workspace, you may need to install the following dependencies:
@@ -18,7 +18,7 @@ colcon build --packages-select glider
 If you only want the api you can build with:
 ```
 cmake -S . -B build -DBUILD_ROS=OFF
-cmake --build build 
+cmake --build build
 ```
 
 ## Running Glider
@@ -40,7 +40,13 @@ the parameters mean:
  - `publishers.viz.use`: if true will publish an `Odometry` topic for visualization centered around the origin.
  - `publishers.viz.origin_easting`: the easting value you want to viz odometry to center around.
  - `publishers.viz.origin_northing`: the northing value you want the viz odometry to center around.
- - `subscribers.use_odom`: Still under development.
+ - `subscribers.imu_topic`, `gps_topic`, `dgps_topic`, `odom_topic`: input topic names.
+ - `subscribers.use_gps`, `use_dgps`, `use_odom`: enable each aiding source. Avoid enabling both GPS inputs when they represent the same receiver fix.
+ - `subscribers.gps_rejection_variance`: hard GPS variance ceiling in m². Measurements above it are rejected while local odometry remains active.
+
+The checked-in ROS parameters use a VectorNav IMU on `/vectornav/imu`, LIO on
+`/rko_lio/odometry`, and the ENU DGPS fix on `/sept/enu/dfix`. LIO remains active
+while GPS is absent or rejected.
 
 ## Glider Setup
 You can configure glider itself in `config/glider-params.yaml`, this is where you can specify the parameters for the factor graph. Here's more detail on each parameter:
@@ -61,19 +67,18 @@ You can configure glider itself in `config/glider-params.yaml`, this is where yo
  - `logging.stdout`: output log statements to terminal in addition to the logfile
  - `optimizer.smooth`: if true the factor graph will optimize using a fixed lag smoother, otherwise it will use iSAM2.
  - `optimizer.lag_time`: period of time the fixed lag smoother should look at in seconds.
- - `gps_to_imu`: the relative transformation from your gps to your imu in the FLU frame.
+ - `extrinsics`: the single hardware-calibration section. Sensor poses are entered relative to the LiDAR using ROS FLU axes (+X forward, +Y left, +Z up), metres, and XYZ roll/pitch/yaw degrees. Glider converts them to its body frame internally.
 
 ### Building and Running Unit Tests
-We use GTest to run unit tests. You can build the tests with 
-``` 
+We use GTest to run unit tests. You can build the tests with
+```
 cd glider
 cmake -S . -B build -DBUILD_TESTS=ON
 cmake --build build
 ```
 and run with:
 ```
-cd build 
+cd build
 ctest
 ```
 Note these tests are run on PR's and pushes to the `ros2` branch.
-

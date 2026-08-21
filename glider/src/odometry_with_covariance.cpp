@@ -14,18 +14,19 @@ using namespace Glider;
 OdometryWithCovariance::OdometryWithCovariance(gtsam::Values& vals, int64_t timestamp, gtsam::Key key, gtsam::Matrix& pose_cov, gtsam::Matrix& velocity_cov, bool init) : Odometry(vals, timestamp, key, init)
 {
     gtsam::imuBias::ConstantBias bias = vals.at<gtsam::imuBias::ConstantBias>(B(key));
-        
+
     key_index_ = key;
     accelerometer_bias_ = bias.accelerometer();
     gyroscope_bias_ = bias.gyroscope();
 
     pose_covariance_ = pose_cov;
     velocity_covariance_ = velocity_cov;
-    position_covariance_ = pose_cov.block<3,3>(0,0);
+    // GTSAM Pose3 tangent covariance is ordered [rotation, translation].
+    position_covariance_ = pose_cov.block<3,3>(3,3);
 
     is_moving_ = (velocity_.norm() > 0.01) ? true : false;
-
     initialized_ = init;
+    is_gps_offset_initialized_ = false;
 }
 
 OdometryWithCovariance OdometryWithCovariance::Uninitialized()
@@ -62,7 +63,7 @@ T OdometryWithCovariance::getBias() const
     {
         Eigen::Vector3d ab = accelerometer_bias_;
         Eigen::Vector3d gb = gyroscope_bias_;
-        
+
         return std::make_pair(ab, gb);
     }
     else
@@ -79,9 +80,9 @@ T OdometryWithCovariance::getAccelerometerBias() const
     if constexpr (std::is_same_v<T, gtsam::Vector3>)
     {
         return accelerometer_bias_;
-    }   
+    }
     else if constexpr (std::is_same_v<T, Eigen::Vector3d>)
-    {  
+    {
         Eigen::Vector3d bias = accelerometer_bias_;
         return bias;
     }
@@ -101,7 +102,7 @@ T OdometryWithCovariance::getGyroscopeBias() const
     }
     else if constexpr (std::is_same_v<T, Eigen::Vector3d>)
     {
-        Eigen::Vector3d bias = gyroscope_bias_; 
+        Eigen::Vector3d bias = gyroscope_bias_;
         return bias;
     }
     else

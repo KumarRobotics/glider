@@ -7,6 +7,7 @@
 */
 
 #include <gtest/gtest.h>
+#include <Eigen/Eigenvalues>
 
 #include "glider/core/odometry_with_covariance.hpp"
 #include "glider/core/factor_manager.hpp"
@@ -75,7 +76,8 @@ TEST(OdometryWithCovarainceTestSuite, TestCovariances)
     Glider::FactorManager manager(params);
 
     Glider::OdometryWithCovariance odom;
-    
+    int64_t timestamp = 0;
+
     for (uint64_t i = 0; i < params.initial_num_measurements + 1; ++i)
     {
         // provide imu measurements for initialization
@@ -84,42 +86,25 @@ TEST(OdometryWithCovarainceTestSuite, TestCovariances)
             Eigen::Vector3d accel(AX, AY, AZ);
             Eigen::Vector3d gyro(GX, GY, GZ);
             Eigen::Vector4d orient(QW, QX, QY, QZ);
-            int64_t timestamp = (i+1) * (j+1);
+            timestamp += 10000000;
             manager.addImuFactor(timestamp, accel, gyro, orient);
         }
         Eigen::Vector3d meas(LATITUDE, LONGITUDE, TZ);
-        manager.addGpsFactor(i+1, meas);
-        odom = manager.runner(1);
+        manager.addGpsFactor(timestamp, meas);
+        odom = manager.runner(timestamp);
     }
 
-    const double EPSILON = 1e-10;
-    // test pose covariance is greater than zero 
-    Eigen::MatrixXd pose_cov = odom.getPoseCovariance();
-    for (double& c : pose_cov.reshaped())
-    {
-        if (std::abs(c) < EPSILON) c = 0.0;
-        ASSERT_GE(c, 0.0);
-    }
-    ASSERT_GT(pose_cov.sum(), 0.0);
+    const auto expect_valid_covariance = [](const Eigen::MatrixXd& covariance) {
+        EXPECT_TRUE(covariance.isApprox(covariance.transpose(), 1e-9));
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(covariance);
+        ASSERT_EQ(solver.info(), Eigen::Success);
+        EXPECT_GE(solver.eigenvalues().minCoeff(), -1e-9);
+        EXPECT_GT(covariance.diagonal().sum(), 0.0);
+    };
 
-    // test position covariance
-    Eigen::MatrixXd pos_cov = odom.getPositionCovariance();
-    for (double& c : pos_cov.reshaped())
-    {
-        if (std::abs(c) < EPSILON) c = 0.0;
-        
-        ASSERT_GE(c, 0.0);
-    }
-    ASSERT_GT(pos_cov.sum(), 0.0);
-
-    // test velocity covariance
-    Eigen::MatrixXd vel_cov = odom.getVelocityCovariance();
-    for (double& c : vel_cov.reshaped())
-    {
-        if (std::abs(c) < EPSILON) c = 0.0;
-        ASSERT_GE(c, 0.0);
-    }
-    ASSERT_GT(vel_cov.sum(), 0.0);
+    expect_valid_covariance(odom.getPoseCovariance());
+    expect_valid_covariance(odom.getPositionCovariance());
+    expect_valid_covariance(odom.getVelocityCovariance());
 }
 
 TEST(OdometryWithCovarianceTestSuite, TestBiases)
@@ -191,13 +176,14 @@ TEST(OdometryWithCovarianceTestSuite, TestBiases)
 }
 
 TEST(OdometryWithCovarianceTestSuite, TestKeyIndex)
-{ 
+{
     // initialized glider factor manager and params
     Glider::Parameters params = Glider::Parameters::Load("../config/glider-params.yaml");
     Glider::FactorManager manager(params);
 
     Glider::OdometryWithCovariance odom;
-    
+    int64_t timestamp = 0;
+
     for (uint64_t i = 0; i < params.initial_num_measurements + 1; ++i)
     {
         // provide imu measurements for initialization
@@ -206,12 +192,12 @@ TEST(OdometryWithCovarianceTestSuite, TestKeyIndex)
             Eigen::Vector3d accel(AX, AY, AZ);
             Eigen::Vector3d gyro(GX, GY, GZ);
             Eigen::Vector4d orient(QW, QX, QY, QZ);
-            int64_t timestamp = (i+1) * (j+1);
+            timestamp += 10000000;
             manager.addImuFactor(timestamp, accel, gyro, orient);
         }
         Eigen::Vector3d meas(LATITUDE, LONGITUDE, TZ);
-        manager.addGpsFactor(i+1, meas);
-        odom = manager.runner(1);
+        manager.addGpsFactor(timestamp, meas);
+        odom = manager.runner(timestamp);
     }
 
     ASSERT_EQ(odom.getKeyIndex<gtsam::Key>(), params.initial_num_measurements);

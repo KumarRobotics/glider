@@ -44,6 +44,9 @@ if (BUILD_ROS)
   find_package(std_msgs REQUIRED)
   find_package(nav_msgs REQUIRED)
   find_package(gps_msgs REQUIRED)
+  find_package(dgps_msgs REQUIRED)
+  find_package(geometry_msgs REQUIRED)
+  find_package(tf2_ros REQUIRED)
 
   set(node_plugins "")
 endif()
@@ -97,6 +100,8 @@ if (BUILD_ROS)
     geometry_msgs
     nav_msgs
     gps_msgs
+    dgps_msgs
+    tf2_ros
   )
 
   add_executable(${PROJECT_NAME}_node
@@ -146,6 +151,7 @@ if (BUILD_ROS)
     sensor_msgs
     geometry_msgs
     nav_msgs
+    dgps_msgs
     Eigen3
   )
 

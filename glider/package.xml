@@ -17,6 +17,8 @@
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>gps_msgs</depend>
+  <depend>dgps_msgs</depend>
+  <depend>tf2_ros</depend>
   <depend>tf2_eigen</depend>
   <depend>message_filters</depend>
   

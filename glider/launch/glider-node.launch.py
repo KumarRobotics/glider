@@ -23,10 +23,10 @@ def generate_launch_description():
         default_value='false',
         description='Use simulation time'
     )
-    
+
     # Get launch configurations
     use_sim_time = LaunchConfiguration('use_sim_time')
-    
+
     # Find package share directory
     glider_share = FindPackageShare('glider')
     glider_share_dir = get_package_share_directory('glider')
@@ -37,13 +37,13 @@ def generate_launch_description():
         'config',
         'ros-params.yaml'
     ])
-    
+
     graph_params_file = PathJoinSubstitution([
         glider_share,
         'config',
         'glider-params.yaml'
     ])
-    
+
     # create logging directory
     with open(os.path.join(glider_share_dir, "config", "glider-params.yaml")) as f:
         config = yaml.safe_load(f)
@@ -58,14 +58,8 @@ def generate_launch_description():
         parameters=[
             ros_params_file,
             {'path': graph_params_file,
-             'use_sim_time': use_sim_time,
-             'use_odom': False}
-        ],
-        remappings=[
-            ('/dgps', '/dgps/fix'),
-            ('/imu', '/vectornav/imu'),
-            ('/odom', '/Odometry'),
+             'use_sim_time': use_sim_time}
         ]
     )
-    
+
     return LaunchDescription([use_sim_time_arg, glider_node])
