@@ -32,8 +32,8 @@ FactorManager::FactorManager(const Parameters& params)
 
     // set noise model
     gps_noise_ = gtsam::noiseModel::Isotropic::Sigma(3, params.gps_noise);
-    orient_noise_ = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(params.roll_pitch_cov, params.roll_pitch_cov, params.heading_cov));
-    dgpsfm_noise_ = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(M_PI/2, M_PI/2, params.dgpsfm_cov));
+    orient_noise_ = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(params.roll_pitch_cov, params.roll_pitch_cov, 100));
+    dgpsfm_noise_ = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(100, 100, params.dgpsfm_cov));
     
     // set key index
     key_index_ = 0;
@@ -216,6 +216,8 @@ void FactorManager::addGpsFactor(int64_t timestamp, const Eigen::Vector3d& gps, 
     // add gps measurement to factor graph as gtsam object
     gtsam::Point3 meas(gps(0), gps(1), gps(2));
     gtsam::Rot3 rot = gtsam::Rot3::Ypr(heading, 0.0, 0.0);
+    //gtsam::Rot3 imu_rot = gtsam::Rot3::Quaternion(orient_(0), orient_(1), orient_(2), orient_(3));
+    //graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), imu_rot, orient_noise_);
 
     graph_.add(gtsam::GPSFactor(X(key_index_), gps, gps_noise_));
     if (fuse) graph_.addExpressionFactor(gtsam::rotation(X(key_index_)), rot, dgpsfm_noise_);

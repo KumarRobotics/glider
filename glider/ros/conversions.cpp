@@ -18,7 +18,7 @@ Output Conversions::rosToEigen(const Input& msg)
     }
     else if constexpr (std::is_same_v<Input, geometry_msgs::msg::Quaternion>)
     {
-        return RosToEigen::orientConvert(msg);
+        return RosToEigen::orientConvert<Output>(msg);
     }
     else if constexpr(std::is_same_v<Input, sensor_msgs::msg::NavSatFix>)
     {
@@ -86,9 +86,17 @@ Eigen::Vector3d Conversions::RosToEigen::vector3Convert(const geometry_msgs::msg
     return Eigen::Vector3d(msg.x, msg.y, msg.z);
 }   
 
-Eigen::Vector4d Conversions::RosToEigen::orientConvert(const geometry_msgs::msg::Quaternion& msg)
+template <typename Output>
+Output Conversions::RosToEigen::orientConvert(const geometry_msgs::msg::Quaternion& msg)
 {
-    return Eigen::Vector4d(msg.w, msg.x, msg.y, msg.z);
+    if constexpr (std::is_same_v<Output, Eigen::Vector4d>) 
+    {
+        return Eigen::Vector4d(msg.w, msg.x, msg.y, msg.z);
+    }
+    else
+    {
+        return Eigen::Quaterniond(msg.w, msg.x, msg.y, msg.z);
+    }
 }
 
 Eigen::Vector3d Conversions::RosToEigen::gpsConvert(const sensor_msgs::msg::NavSatFix& msg)
@@ -362,6 +370,7 @@ void Conversions::addCovariance(const Glider::OdometryWithCovariance& odom_wc, T
 template Eigen::Vector3d Conversions::rosToEigen<Eigen::Vector3d>(const geometry_msgs::msg::Vector3& msg);
 template Eigen::Vector3d Conversions::rosToEigen<Eigen::Vector3d>(const sensor_msgs::msg::NavSatFix& msg);
 template Eigen::Vector4d Conversions::rosToEigen<Eigen::Vector4d>(const geometry_msgs::msg::Quaternion& msg);
+template Eigen::Quaterniond Conversions::rosToEigen<Eigen::Quaterniond>(const geometry_msgs::msg::Quaternion& msg);
 template Eigen::Isometry3d Conversions::rosToEigen<Eigen::Isometry3d>(const geometry_msgs::msg::PoseStamped& msg);
 template Eigen::Isometry3d Conversions::rosToEigen<Eigen::Isometry3d>(const nav_msgs::msg::Odometry& msg);
 template std::pair<Eigen::Vector3d, Eigen::Vector2d> Conversions::rosToEigen<std::pair<Eigen::Vector3d, Eigen::Vector2d>>(const gps_msgs::msg::GPSFix& msg);
@@ -379,3 +388,6 @@ template sensor_msgs::msg::NavSatFix Conversions::odomToRos<sensor_msgs::msg::Na
 
 template void Conversions::addCovariance<nav_msgs::msg::Odometry>(const Glider::OdometryWithCovariance& odom_wc, nav_msgs::msg::Odometry& msg);
 template void Conversions::addCovariance<sensor_msgs::msg::NavSatFix>(const Glider::OdometryWithCovariance& odom_wc, sensor_msgs::msg::NavSatFix& msg);
+
+template Eigen::Vector4d Conversions::RosToEigen::orientConvert<Eigen::Vector4d>(const geometry_msgs::msg::Quaternion& msg);
+template Eigen::Quaterniond Conversions::RosToEigen::orientConvert<Eigen::Quaterniond>(const geometry_msgs::msg::Quaternion& msg);

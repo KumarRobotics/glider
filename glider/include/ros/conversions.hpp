@@ -52,7 +52,8 @@ class Conversions
         struct RosToEigen
         {
             static Eigen::Vector3d vector3Convert(const geometry_msgs::msg::Vector3& vec);
-            static Eigen::Vector4d orientConvert(const geometry_msgs::msg::Quaternion& orient);
+            template <typename Output>
+            static Output orientConvert(const geometry_msgs::msg::Quaternion& orient);
 
             static Eigen::Vector3d gpsConvert(const sensor_msgs::msg::NavSatFix& gps);
             static std::pair<Eigen::Vector3d, Eigen::Vector2d> dgpsConvert(const gps_msgs::msg::GPSFix& gps);
