@@ -9,7 +9,7 @@
 namespace Glider
 {
 
-struct GlobalEKFConfig
+struct GlobalKFConfig
 {
     double sigma_heading = 0.1;
 
@@ -40,11 +40,11 @@ struct GlobalState
     double heading_deg;
 };
 
-class GlobalEKF
+class GlobalKF
 {
     public:
-        GlobalEKF() = default;
-        explicit GlobalEKF(const GlobalEKFConfig& config);
+        GlobalKF() = default;
+        explicit GlobalKF(const GlobalKFConfig& config);
 
         void updateFixStatus(int64_t timestamp, int8_t status);
         void checkGpsTimeout(int64_t now);
@@ -75,7 +75,7 @@ class GlobalEKF
         bool updateHeading(double z, double r);
         void initHeading(int64_t timestamp, double z, double r);
 
-        GlobalEKFConfig config_;
+        GlobalKFConfig config_;
         GpsStateMachine gate_;
 
         Eigen::Vector3d position_ = Eigen::Vector3d::Zero();

@@ -1,33 +1,33 @@
 
 
-#include "ros/gekf_node.hpp"
+#include "ros/gkf_node.hpp"
 
 using namespace GliderROS;
 
 constexpr double kDegToRad = M_PI / 180.0;
 constexpr double kRadToDeg = 180.0 / M_PI;
 
-GlobalEKFNode::GlobalEKFNode(const rclcpp::NodeOptions& options) : rclcpp::Node("gekf_node", options)
+GlobalKFNode::GlobalKFNode(const rclcpp::NodeOptions& options) : rclcpp::Node("gekf_node", options)
 {
-    ekf_ = std::make_unique<Glider::GlobalEKF>();
+    ekf_ = std::make_unique<Glider::GlobalKF>();
 
     gps_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
         "/ublox_gps_node/fix", 
         10,
-        std::bind(&GlobalEKFNode::gpsCallback, this, std::placeholders::_1)
+        std::bind(&GlobalKFNode::gpsCallback, this, std::placeholders::_1)
     );
 
     nav_heading_sub_ = create_subscription<sensor_msgs::msg::Imu>(
         "/ublox_raw/navheading",
         10,
-        std::bind(&GlobalEKFNode::navHeadingCallback, this, std::placeholders::_1)
+        std::bind(&GlobalKFNode::navHeadingCallback, this, std::placeholders::_1)
     );
 
     auto qos = rclcpp::SensorDataQoS();
     mag_heading_sub_ = create_subscription<std_msgs::msg::Float64>(
         "/mavros/global_position/compass_hdg",
         qos,
-        std::bind(&GlobalEKFNode::magHeadingCallback, this, std::placeholders::_1)
+        std::bind(&GlobalKFNode::magHeadingCallback, this, std::placeholders::_1)
     );
 
     state_pub_ = create_publisher<gps_msgs::msg::GPSFix>(
@@ -38,21 +38,21 @@ GlobalEKFNode::GlobalEKFNode(const rclcpp::NodeOptions& options) : rclcpp::Node(
     std::chrono::milliseconds d = GliderROS::Conversions::hzToDuration(10.0);
     timer_ = create_wall_timer(
         d,
-        std::bind(&GlobalEKFNode::magPassCallback, this)
+        std::bind(&GlobalKFNode::magPassCallback, this)
     );
 }
 
-int64_t GlobalEKFNode::getTime(const builtin_interfaces::msg::Time& stamp) const
+int64_t GlobalKFNode::getTime(const builtin_interfaces::msg::Time& stamp) const
 {
    return (static_cast<int64_t>(stamp.sec) * 1000000000LL) + static_cast<int64_t>(stamp.nanosec);
 }
 
-void GlobalEKFNode::magPassCallback()
+void GlobalKFNode::magPassCallback()
 { 
     bool status = ekf_->updateCompass(mag_stamped_.first, mag_stamped_.second);
 }
 
-void GlobalEKFNode::publishState(const Glider::GlobalState& state)
+void GlobalKFNode::publishState(const Glider::GlobalState& state)
 {
     gps_msgs::msg::GPSFix msg;
     msg.latitude = state.latitude;
@@ -63,7 +63,7 @@ void GlobalEKFNode::publishState(const Glider::GlobalState& state)
     state_pub_->publish(msg);
 }
 
-void GlobalEKFNode::gpsCallback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg)
+void GlobalKFNode::gpsCallback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg)
 {
     int64_t timestamp = getTime(this->now());
     int8_t status = msg->status.status;
@@ -80,7 +80,7 @@ void GlobalEKFNode::gpsCallback(const sensor_msgs::msg::NavSatFix::ConstSharedPt
     std::cout << "[GEKF] Heading: " << state.heading_deg << " Using GPS: "<< to_string(ekf_->gate().state()) << std::endl;
 }
 
-void GlobalEKFNode::navHeadingCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
+void GlobalKFNode::navHeadingCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 {
     // this timestamp is NO BUENO
     int64_t timestamp = getTime(this->now());
@@ -91,7 +91,7 @@ void GlobalEKFNode::navHeadingCallback(const sensor_msgs::msg::Imu::ConstSharedP
     std::cout << "[GEKF] GPS Heading Status: " << std::boolalpha << status << " heading: "<< ekf_->heading()* 180.0 / M_PI << std::endl;
 }
 
-void GlobalEKFNode::magHeadingCallback(const std_msgs::msg::Float64::ConstSharedPtr msg)
+void GlobalKFNode::magHeadingCallback(const std_msgs::msg::Float64::ConstSharedPtr msg)
 {
     int64_t timestamp = getTime(this->now());
     double heading = kDegToRad * msg->data;

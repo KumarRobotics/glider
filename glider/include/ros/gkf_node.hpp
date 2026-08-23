@@ -7,19 +7,19 @@
 #include <gps_msgs/msg/gps_fix.hpp>
 
 #include "ros/conversions.hpp"
-#include "glider/gekf/global_ekf.hpp"
+#include "glider/gkf/global_kf.hpp"
 
 namespace GliderROS
 {
 
-class GlobalEKFNode : public rclcpp::Node
+class GlobalKFNode : public rclcpp::Node
 {
     public:
-        GlobalEKFNode() = default;
-        GlobalEKFNode(const rclcpp::NodeOptions& options);
+        GlobalKFNode() = default;
+        GlobalKFNode(const rclcpp::NodeOptions& options);
 
     private:
-        std::unique_ptr<Glider::GlobalEKF> ekf_;
+        std::unique_ptr<Glider::GlobalKF> ekf_;
 
         void gpsCallback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
         void navHeadingCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg);

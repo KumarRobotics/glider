@@ -1,4 +1,4 @@
-#include "glider/gekf/global_ekf.hpp"
+#include "glider/gkf/global_kf.hpp"
 
 #include <cmath>
 
@@ -32,13 +32,13 @@ double yawFromQuaternion(const Eigen::Quaterniond& q)
 
 }  // namespace
 
-GlobalEKF::GlobalEKF(const GlobalEKFConfig& config)
+GlobalKF::GlobalKF(const GlobalKFConfig& config)
 : config_(config),
   gate_(config.gps_gate)
 {
 }
 
-void GlobalEKF::reset()
+void GlobalKF::reset()
 {
     gate_.reset();
 
@@ -51,17 +51,17 @@ void GlobalEKF::reset()
     heading_initialized_ = false;
 }
 
-void GlobalEKF::updateFixStatus(int64_t timestamp, int8_t status)
+void GlobalKF::updateFixStatus(int64_t timestamp, int8_t status)
 {
     gate_.update(timestamp, status);
 }
 
-void GlobalEKF::checkGpsTimeout(int64_t now)
+void GlobalKF::checkGpsTimeout(int64_t now)
 {
     gate_.checkTimeout(now);
 }
 
-void GlobalEKF::updatePosition(const Eigen::Vector3d& lla, double horizontal_sigma, double vertical_sigma)
+void GlobalKF::updatePosition(const Eigen::Vector3d& lla, double horizontal_sigma, double vertical_sigma)
 {
     position_(0) = lla(0) * kDegToRad;
     position_(1) = lla(1) * kDegToRad;
@@ -82,7 +82,7 @@ void GlobalEKF::updatePosition(const Eigen::Vector3d& lla, double horizontal_sig
     position_initialized_ = true;
 }
 
-void GlobalEKF::initHeading(int64_t timestamp, double z, double r)
+void GlobalKF::initHeading(int64_t timestamp, double z, double r)
 {
     heading_ = z;
     heading_variance_ = r;
@@ -90,7 +90,7 @@ void GlobalEKF::initHeading(int64_t timestamp, double z, double r)
     heading_initialized_ = true;
 }
 
-void GlobalEKF::propagate(int64_t timestamp)
+void GlobalKF::propagate(int64_t timestamp)
 {
     double dt = static_cast<double>(timestamp - last_heading_time_) * config_.seconds_per_tick;
     last_heading_time_ = timestamp;
@@ -105,7 +105,7 @@ void GlobalEKF::propagate(int64_t timestamp)
     heading_variance_ += config_.sigma_heading * config_.sigma_heading * dt;
 }
 
-bool GlobalEKF::updateHeading(double z, double r)
+bool GlobalKF::updateHeading(double z, double r)
 {
     const double y = wrapPi(z - heading_);
     const double s = heading_variance_ + r;
@@ -121,7 +121,7 @@ bool GlobalEKF::updateHeading(double z, double r)
     return true;
 }
 
-bool GlobalEKF::updateCompass(int64_t timestamp, double heading)
+bool GlobalKF::updateCompass(int64_t timestamp, double heading)
 {
     const double z = wrapPi(heading + config_.mag_declination);
     const double r = config_.sigma_compass * config_.sigma_compass;
@@ -135,7 +135,7 @@ bool GlobalEKF::updateCompass(int64_t timestamp, double heading)
     return updateHeading(z, r);
 }
 
-bool GlobalEKF::updateGpsHeading(int64_t timestamp, const Eigen::Quaterniond& orientation)
+bool GlobalKF::updateGpsHeading(int64_t timestamp, const Eigen::Quaterniond& orientation)
 {
     if (!gate_.trusted()) {
         return false;
@@ -153,18 +153,18 @@ bool GlobalEKF::updateGpsHeading(int64_t timestamp, const Eigen::Quaterniond& or
     return updateHeading(z, r);
 }
 
-Eigen::Vector3d GlobalEKF::position() const
+Eigen::Vector3d GlobalKF::position() const
 {
     return Eigen::Vector3d(position_(0) * kRadToDeg, position_(1) * kRadToDeg, position_(2));
 }
 
-Eigen::Matrix3d GlobalEKF::positionCovariance() const
+Eigen::Matrix3d GlobalKF::positionCovariance() const
 {
     return Eigen::Matrix3d(position_variance_.asDiagonal());
 }
 
 template <GlobalFrame F>
-GlobalState GlobalEKF::state() const
+GlobalState GlobalKF::state() const
 {
     GlobalState state;
     state.latitude = position_(0) * kRadToDeg;
@@ -181,5 +181,5 @@ GlobalState GlobalEKF::state() const
     return state;
 }
 
-template GlobalState GlobalEKF::state<GlobalFrame::ENU>() const;
-template GlobalState GlobalEKF::state<GlobalFrame::NED>() const;
+template GlobalState GlobalKF::state<GlobalFrame::ENU>() const;
+template GlobalState GlobalKF::state<GlobalFrame::NED>() const;

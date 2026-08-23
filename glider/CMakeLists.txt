@@ -76,12 +76,12 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     tbb
 )
 
-add_library(${PROJECT_NAME}_gekf SHARED
+add_library(${PROJECT_NAME}_gkf SHARED
     src/gps_state_machine.cpp
-    src/global_ekf.cpp
+    src/global_kf.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}_gekf PUBLIC
+target_link_libraries(${PROJECT_NAME}_gkf PUBLIC
     Eigen3::Eigen
 )
 
@@ -90,13 +90,13 @@ if (BUILD_ROS)
   add_library(${PROJECT_NAME}_ros SHARED
     ros/conversions.cpp
     ros/glider_node.cpp
-    ros/gekf_node.cpp
+    ros/gkf_node.cpp
   )
 
   target_link_libraries(${PROJECT_NAME}_ros
     Eigen3::Eigen
     ${PROJECT_NAME}
-    ${PROJECT_NAME}_gekf
+    ${PROJECT_NAME}_gkf
   )
 
   ament_target_dependencies(${PROJECT_NAME}_ros 
@@ -115,7 +115,7 @@ if (BUILD_ROS)
   target_link_libraries(${PROJECT_NAME}_node
     rclcpp::rclcpp
     ${PROJECT_NAME}
-    ${PROJECT_NAME}_gekf
+    ${PROJECT_NAME}_gkf
     ${PROJECT_NAME}_ros
   )
 
@@ -135,7 +135,7 @@ if (BUILD_ROS)
 
   install(TARGETS
     ${PROJECT_NAME}
-    ${PROJECT_NAME}_gekf
+    ${PROJECT_NAME}_gkf
     ${PROJECT_NAME}_ros
     EXPORT ${PROJECT_NAME}_targets
     ARCHIVE DESTINATION lib
@@ -149,7 +149,7 @@ if (BUILD_ROS)
   )
 
   ament_export_targets(${PROJECT_NAME}_targets HAS_LIBRARY_TARGET)
-  ament_export_libraries(${PROJECT_NAME} ${PROJECT_NAME}_gekf ${PROJECT_NAME}_ros)
+  ament_export_libraries(${PROJECT_NAME} ${PROJECT_NAME}_gkf ${PROJECT_NAME}_ros)
   ament_export_include_directories(include)
   ament_export_dependencies(
     rclcpp

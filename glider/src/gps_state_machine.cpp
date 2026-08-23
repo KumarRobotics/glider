@@ -1,4 +1,4 @@
-#include "glider/gekf/gps_state_machine.hpp"
+#include "glider/gkf/gps_state_machine.hpp"
 
 namespace Glider
 {

@@ -4,7 +4,7 @@
 */
 
 #include "ros/glider_node.hpp"
-#include "ros/gekf_node.hpp"
+#include "ros/gkf_node.hpp"
 #include <rclcpp_components/register_node_macro.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     try
     {
         //auto node = std::make_shared<GliderROS::GliderNode>(options);
-        auto node = std::make_shared<GliderROS::GlobalEKFNode>(options);
+        auto node = std::make_shared<GliderROS::GlobalKFNode>(options);
         rclcpp::executors::MultiThreadedExecutor executor;
 
         executor.add_node(node);
